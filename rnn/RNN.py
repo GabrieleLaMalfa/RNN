@@ -10,7 +10,7 @@ import activations as actv
 
 import numpy as np
 
-################# RNN Forward and Backward Propagation #######################
+################# RNN Forward and Backward Propagation ######################
 
 activations_dictionary = {"tanh": actv.tanh , "softmax": actv.softmax}
 derivatives_dictionary = {"dtanh": derv.dtanh , "dsoftmax": derv.dsoftmax}
