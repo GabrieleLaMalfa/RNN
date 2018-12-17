@@ -43,8 +43,12 @@ def series_to_matrix(series,
                   proportionally to val_rel_percentage.
 """
 def generate_batches(filename, window, mode='train-test', non_train_percentage=.7, val_rel_percentage=.5):
+
     data = pd.read_csv(filename, delimiter=',', header=0)
     data = (data.iloc[:, 0]).values
+
+    # normalize dataset (max-min method)
+    data = (data-np.min(data))/(np.max(data)-np.min(data))
 
     if mode == 'train':
 
@@ -130,8 +134,6 @@ def lstm_exp(filename, num_units, window, batch_size=3, l_rate=.01,
     # calculate loss and optimization algorithm
     loss = tf.losses.mean_squared_error(labels=y, predictions=y_hat)
     opt = tf.train.AdamOptimizer(learning_rate=l_rate).minimize(loss)
-    # optimization for test purposes (different learning rate)
-    opt_test = tf.train.AdamOptimizer(learning_rate=l_rate_test).minimize(loss)
 
     # estimate error as the distance (L1) between prediction and target
     error = tf.abs(y_hat - y)
@@ -177,10 +179,6 @@ def lstm_exp(filename, num_units, window, batch_size=3, l_rate=.01,
                     # estimate validation error and append it to a list
                     list_validation_error.append(sess.run(error, feed_dict={x: batch_val_x, y: batch_val_y}))
 
-                    # feed back the signal every n test samples
-                    if iter_val_ % 1 == 0:
-                        sess.run(opt_test, feed_dict={x: batch_val_x, y: batch_val_y})
-
                     iter_val_ += 1
 
             # test
@@ -198,10 +196,6 @@ def lstm_exp(filename, num_units, window, batch_size=3, l_rate=.01,
                     plot_y_hat.append(pred_y)
                     plot_y.append(batch_test_y)
                     list_test_error.append(sess.run(error, feed_dict={x: batch_test_x, y: batch_test_y}))
-
-                    # feed back the signal every n test samples
-                    if iter_test_ % 1 == 0:
-                        sess.run(opt_test, feed_dict={x: batch_test_x, y: batch_test_y})
 
                     iter_test_ += 1
 

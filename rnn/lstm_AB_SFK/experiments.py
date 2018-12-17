@@ -15,9 +15,9 @@ if __name__ == '__main__':
 
     DATA_PATH = 'AB_SKF.csv'
 
-    results = LSTM_exp.lstm_exp(filename=DATA_PATH, num_units=256, window=1, batch_size=5,
-                                l_rate=0.05, non_train_percentage=0.6, training_epochs=5,
-                                l_rate_test=.05, val_rel_percentage=.5)
+    results = LSTM_exp.lstm_exp(filename=DATA_PATH, num_units=64, window=5, batch_size=3,
+                                l_rate=5e-5, non_train_percentage=0.3, training_epochs=25,
+                                l_rate_test=.05, val_rel_percentage=.8)
 
     # Anomaly detection
     anomaly_threshold = 5e-3  # /tau
