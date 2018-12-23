@@ -19,7 +19,7 @@ if __name__ == '__main__':
     tf.reset_default_graph()
         
     batch_size = 1
-    sequence_len = 10
+    sequence_len = 15
     learning_rate = 1e-3
     
     # define input/output pairs
@@ -71,14 +71,14 @@ if __name__ == '__main__':
     
     # extract train and test
     x_train, y_train, x_valid, y_valid, x_test, y_test = utils.generate_batches(
-                                                             filename='data/Topix_index.csv', 
+                                                             filename='data/space_shuttle_marotta_valve.csv', 
                                                              window=sequence_len, mode='validation', 
                                                              non_train_percentage=.3,
-                                                             val_rel_percentage=.6,
+                                                             val_rel_percentage=.5,
                                                              normalize=True)
     
     # train the model
-    epochs = 25
+    epochs = 10
     init = tf.global_variables_initializer()
 
     with tf.Session() as sess:
@@ -164,5 +164,4 @@ if __name__ == '__main__':
             plt.axvspan(i, i+1, color='yellow', alpha=0.5, lw=0)
         
     fig.tight_layout()
-    plt.show()
-               
+    plt.show()               
