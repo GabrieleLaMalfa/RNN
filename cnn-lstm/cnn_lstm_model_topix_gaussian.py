@@ -39,8 +39,7 @@ if __name__ == '__main__':
                                                           number_of_filters]))
     bias_conv = tf.Variable(tf.zeros(shape=[number_of_filters]))
     
-    layer_conv = tf.nn.conv1d(input_, filters=weights_conv, stride=1, padding='SAME')
-    
+    layer_conv = tf.nn.conv1d(input_, filters=weights_conv, stride=1, padding='SAME')    
     layer_conv = tf.nn.relu(layer_conv)
     
     # flatten the output
@@ -49,24 +48,22 @@ if __name__ == '__main__':
     layer_conv_flatten = tf.reshape(layer_conv, [batch_size, sequence_len, number_of_elements])
     
     # define lstm layer(s)
-    lstm_size = 128
-    number_of_lstm_layers = 1
+    number_of_lstm_layers = 5
     
-    cell_lstm = tf.contrib.rnn.BasicLSTMCell(lstm_size)
+    cell_lstm = tf.contrib.rnn.BasicLSTMCell(number_of_filters)
     layer_lstm = tf.contrib.rnn.MultiRNNCell([cell_lstm for _ in range(number_of_lstm_layers)])
-    init_state = layer_lstm.zero_state(batch_size, tf.float32)
-    outputs, states = tf.nn.dynamic_rnn(layer_lstm, layer_conv_flatten, initial_state=init_state)
+    outputs, states = tf.nn.dynamic_rnn(layer_lstm, layer_conv_flatten, dtype=tf.float32)
     
     # dense layer extraction
     output_lstm = outputs[:, -1, :]
-    weights_dense = tf.Variable(tf.truncated_normal(shape=[lstm_size, 1]))
+    weights_dense = tf.Variable(tf.truncated_normal(shape=[number_of_filters, 1]))
     bias_dense = tf.Variable(tf.zeros(shape=[1]))
     
     layer_dense = tf.matmul(output_lstm, weights_dense) + bias_dense
     prediction = layer_dense  # linear activation
     
     # loss evaluation
-    loss = tf.losses.mean_squared_error(labels=target, predictions=prediction)
+    loss = tf.losses.mean_squared_error(labels=target[-1], predictions=prediction[-1])
     optimizer = tf.train.AdamOptimizer(learning_rate).minimize(loss)        
     
     # extract train and test
@@ -78,7 +75,7 @@ if __name__ == '__main__':
                                                              normalize=True)
     
     # train the model
-    epochs = 25
+    epochs = 20
     init = tf.global_variables_initializer()
 
     with tf.Session() as sess:
@@ -112,7 +109,7 @@ if __name__ == '__main__':
             batch_y = y_valid[iter_*batch_size: (iter_+1)*batch_size, np.newaxis]
                 
             errors_valid[iter_] = sess.run(prediction-batch_y, feed_dict={input_: batch_x,
-                                                                 target: batch_y})
+                                                                          target: batch_y})[-1]
 
             iter_ +=  1
         
@@ -136,7 +133,7 @@ if __name__ == '__main__':
             batch_y = y_test[iter_*batch_size: (iter_+1)*batch_size, np.newaxis]
                 
             predictions[iter_] = sess.run(prediction, feed_dict={input_: batch_x,
-                                                                 target: batch_y})
+                                                                 target: batch_y})[-1]
     
             errors_test[iter_] = scistats.norm.pdf(predictions[iter_]-batch_y, mean_valid, std_valid)
             anomalies = np.argwhere(errors_test < threshold)
