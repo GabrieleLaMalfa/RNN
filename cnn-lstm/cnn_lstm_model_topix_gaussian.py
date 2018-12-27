@@ -18,7 +18,7 @@ if __name__ == '__main__':
     # reset computational graph
     tf.reset_default_graph()
         
-    batch_size = 1
+    batch_size = 5
     sequence_len = 10
     learning_rate = 1e-3
     
@@ -75,7 +75,7 @@ if __name__ == '__main__':
                                                              normalize=True)
     
     # train the model
-    epochs = 20
+    epochs = 50
     init = tf.global_variables_initializer()
 
     with tf.Session() as sess:
@@ -132,13 +132,17 @@ if __name__ == '__main__':
             batch_x = x_test[iter_*batch_size: (iter_+1)*batch_size, :, np.newaxis]
             batch_y = y_test[iter_*batch_size: (iter_+1)*batch_size, np.newaxis]
                 
-            predictions[iter_] = sess.run(prediction, feed_dict={input_: batch_x,
-                                                                 target: batch_y})[-1]
-    
-            errors_test[iter_] = scistats.norm.pdf(predictions[iter_]-batch_y, mean_valid, std_valid)
-            anomalies = np.argwhere(errors_test < threshold)
-
+            predictions[iter_*batch_size:(iter_+1)*batch_size] = sess.run(prediction, feed_dict={input_: batch_x,
+                                                                                                 target: batch_y}).flatten()
+            
+            for i in range(batch_size):
+                
+                errors_test[iter_+i] = scistats.norm.pdf(predictions[iter_+i]-batch_y[i], mean_valid, std_valid)
+            
             iter_ +=  1
+            
+        anomalies = np.argwhere(errors_test < threshold)
+
             
     # plot results
     fig, ax1 = plt.subplots()

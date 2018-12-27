@@ -17,8 +17,8 @@ if __name__ == '__main__':
     # reset computational graph
     tf.reset_default_graph()
         
-    batch_size = 1
-    sequence_len = 10
+    batch_size = 5
+    sequence_len = 3
     learning_rate = 1e-3
     
     # define input/output pairs
@@ -31,7 +31,7 @@ if __name__ == '__main__':
     # define convolutional layer(s)
     kernel_size = 3
     number_of_channels = 1
-    number_of_filters = 25
+    number_of_filters = 50
     
     weights_conv = tf.Variable(tf.truncated_normal(shape=[kernel_size, 
                                                           number_of_channels,
@@ -130,10 +130,11 @@ if __name__ == '__main__':
             batch_x = x_test[iter_*batch_size: (iter_+1)*batch_size, :, np.newaxis]
             batch_y = y_test[iter_*batch_size: (iter_+1)*batch_size, np.newaxis]
                 
-            predictions[iter_] = sess.run(prediction, feed_dict={input_: batch_x,
-                                                               target: batch_y})[-1]
-    
-            bin_errors_test[iter_%anomaly_chunk_size] = (0 if (predictions[iter_]-batch_y[-1]) >= mean_valid else 1)
+            predictions[iter_*batch_size:(iter_+1)*batch_size] = sess.run(prediction, feed_dict={input_: batch_x,
+                                                                                                 target: batch_y}).flatten()
+            for i in range(batch_size):
+                
+                bin_errors_test[iter_%anomaly_chunk_size] = (0 if (predictions[iter_+i]-batch_y[i]) >= mean_valid else 1)
     
             # test randomness of the prediciton: every chunk of anomaly_chunk_size
             #  points is considered an anomaly if the related statistic supports 
