@@ -17,8 +17,8 @@ if __name__ == '__main__':
     # reset computational graph
     tf.reset_default_graph()
         
-    batch_size = 5
-    sequence_len = 3
+    batch_size = 2
+    sequence_len = 30
     learning_rate = 1e-3
     
     # define input/output pairs
@@ -29,9 +29,9 @@ if __name__ == '__main__':
     input_ = tf.expand_dims(input_, -1)
     
     # define convolutional layer(s)
-    kernel_size = 3
+    kernel_size = 8
     number_of_channels = 1
-    number_of_filters = 50
+    number_of_filters = 15
     
     weights_conv = tf.Variable(tf.truncated_normal(shape=[kernel_size, 
                                                           number_of_channels,
@@ -47,7 +47,7 @@ if __name__ == '__main__':
     layer_conv_flatten = tf.reshape(layer_conv, [batch_size, sequence_len, number_of_elements])
     
     # define lstm layer(s)
-    number_of_lstm_layers = 5
+    number_of_lstm_layers = 3
     
     cell_lstm = tf.contrib.rnn.BasicLSTMCell(number_of_filters)
     layer_lstm = tf.contrib.rnn.MultiRNNCell([cell_lstm for _ in range(number_of_lstm_layers)])
@@ -74,7 +74,7 @@ if __name__ == '__main__':
                                                              normalize=True)
     
     # train validate and test the model
-    epochs = 50
+    epochs = 2
     init = tf.global_variables_initializer()
 
     with tf.Session() as sess:
@@ -112,11 +112,14 @@ if __name__ == '__main__':
 
             iter_ +=  1
         
-        # estimate mean and deviation of the errors' vector
+        # estimate mean of the errors' vector
+        #  since we have a batch size that may be different from 1 and we consider
+        #   the error of each last batch_y, we need to cut off the zero values
+        errors_valid = errors_valid[:iter_]
         mean_valid = errors_valid.mean()    
                 
         # test
-        anomaly_chunk_size = 25
+        anomaly_chunk_size = 30
         bin_errors_test = np.zeros(shape=anomaly_chunk_size)
         anomalies = list()
         alpha = 1e-3  # test significance
@@ -126,7 +129,7 @@ if __name__ == '__main__':
         iter_ = 0
         
         while iter_ < int(np.floor(x_test.shape[0] / batch_size)):
-    
+                
             batch_x = x_test[iter_*batch_size: (iter_+1)*batch_size, :, np.newaxis]
             batch_y = y_test[iter_*batch_size: (iter_+1)*batch_size, np.newaxis]
                 
@@ -134,25 +137,25 @@ if __name__ == '__main__':
                                                                                                  target: batch_y}).flatten()
             for i in range(batch_size):
                 
-                bin_errors_test[iter_%anomaly_chunk_size] = (0 if (predictions[iter_+i]-batch_y[i]) >= mean_valid else 1)
+                bin_errors_test[iter_%anomaly_chunk_size] = (0 if (predictions[(batch_size*iter_)+i]-batch_y[i]) >= mean_valid else 1)
     
             # test randomness of the prediciton: every chunk of anomaly_chunk_size
             #  points is considered an anomaly if the related statistic supports 
             #  the (null) hypotesis
-            if (iter_ % anomaly_chunk_size) == 0 and iter_ > 0:
+            if (iter_*batch_size % anomaly_chunk_size) == 0 and iter_ > 0:
                 
                 test_result = utils.random_test(bin_errors_test, alpha)
                 bin_errors_test *= 0  # reset the errors' vector for the next step
-                
+                                
                 # append the anomalies' indices
                 if test_result is True:
                     
-                    for j in range(iter_-anomaly_chunk_size, iter_):
+                    for j in range((batch_size*iter_)-anomaly_chunk_size, batch_size*iter_):
                         
                         anomalies.append(j) 
 
             iter_ +=  1
-            
+                        
     # plot results
     fig, ax1 = plt.subplots()
 

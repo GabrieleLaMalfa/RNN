@@ -17,7 +17,7 @@ if __name__ == '__main__':
     tf.reset_default_graph()
         
     batch_size = 1
-    sequence_len = 10
+    sequence_len = 5
     learning_rate = 1e-3
     
     # define input/output pairs
@@ -111,7 +111,10 @@ if __name__ == '__main__':
 
             iter_ +=  1
         
-        # estimate mean and deviation of the errors' vector
+        # estimate mean of the errors' vector
+        #  since we have a batch size that may be different from 1 and we consider
+        #   the error of each last batch_y, we need to cut off the zero values
+        errors_valid = errors_valid[:iter_]
         mean_valid = errors_valid.mean()    
                 
         # test

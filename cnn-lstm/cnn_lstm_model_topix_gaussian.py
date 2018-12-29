@@ -18,8 +18,8 @@ if __name__ == '__main__':
     # reset computational graph
     tf.reset_default_graph()
         
-    batch_size = 5
-    sequence_len = 10
+    batch_size = 1
+    sequence_len = 5
     learning_rate = 1e-3
     
     # define input/output pairs
@@ -75,7 +75,7 @@ if __name__ == '__main__':
                                                              normalize=True)
     
     # train the model
-    epochs = 50
+    epochs = 25
     init = tf.global_variables_initializer()
 
     with tf.Session() as sess:
@@ -114,6 +114,9 @@ if __name__ == '__main__':
             iter_ +=  1
         
         # estimate mean and deviation of the errors' vector
+        #  since we have a batch size that may be different from 1 and we consider
+        #   the error of each last batch_y, we need to cut off the zero values
+        errors_valid = errors_valid[:iter_]
         mean_valid, std_valid = (errors_valid.mean(), errors_valid.std())    
                 
         # test
@@ -137,7 +140,7 @@ if __name__ == '__main__':
             
             for i in range(batch_size):
                 
-                errors_test[iter_+i] = scistats.norm.pdf(predictions[iter_+i]-batch_y[i], mean_valid, std_valid)
+                errors_test[(iter_*batch_size)+i] = scistats.norm.pdf(predictions[(iter_*batch_size)+i]-batch_y[i], mean_valid, std_valid)
             
             iter_ +=  1
             
