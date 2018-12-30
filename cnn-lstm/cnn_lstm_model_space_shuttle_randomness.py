@@ -17,8 +17,8 @@ if __name__ == '__main__':
     # reset computational graph
     tf.reset_default_graph()
         
-    batch_size = 2
-    sequence_len = 30
+    batch_size = 1
+    sequence_len = 10
     learning_rate = 1e-3
     
     # define input/output pairs
@@ -31,7 +31,7 @@ if __name__ == '__main__':
     # define convolutional layer(s)
     kernel_size = 8
     number_of_channels = 1
-    number_of_filters = 15
+    number_of_filters = 35
     
     weights_conv = tf.Variable(tf.truncated_normal(shape=[kernel_size, 
                                                           number_of_channels,
@@ -74,7 +74,7 @@ if __name__ == '__main__':
                                                              normalize=True)
     
     # train validate and test the model
-    epochs = 2
+    epochs = 50
     init = tf.global_variables_initializer()
 
     with tf.Session() as sess:
@@ -116,7 +116,20 @@ if __name__ == '__main__':
         #  since we have a batch size that may be different from 1 and we consider
         #   the error of each last batch_y, we need to cut off the zero values
         errors_valid = errors_valid[:iter_]
-        mean_valid = errors_valid.mean()    
+        mean_valid = errors_valid.mean() 
+        
+        # after the evaluation of the error on the validation, 
+        #  we can safely backpropagate through the dataset
+        iter_ = 0
+        
+        while iter_ < int(np.floor(x_valid.shape[0] / batch_size)):
+    
+            batch_x = x_valid[iter_*batch_size: (iter_+1)*batch_size, :, np.newaxis]
+            batch_y = y_valid[iter_*batch_size: (iter_+1)*batch_size, np.newaxis]
+                
+            sess.run(optimizer, feed_dict={input_: batch_x, target: batch_y})
+
+            iter_ +=  1
                 
         # test
         anomaly_chunk_size = 30
