@@ -17,8 +17,8 @@ if __name__ == '__main__':
     # reset computational graph
     tf.reset_default_graph()
         
-    batch_size = 1
-    sequence_len = 10
+    batch_size = 5
+    sequence_len = 50
     learning_rate = 1e-3
     
     # define input/output pairs
@@ -29,7 +29,7 @@ if __name__ == '__main__':
     input_ = tf.expand_dims(input_, -1)
     
     # define convolutional layer(s)
-    kernel_size = 8
+    kernel_size = 10
     number_of_channels = 1
     number_of_filters = 35
     
@@ -47,7 +47,7 @@ if __name__ == '__main__':
     layer_conv_flatten = tf.reshape(layer_conv, [batch_size, sequence_len, number_of_elements])
     
     # define lstm layer(s)
-    number_of_lstm_layers = 3
+    number_of_lstm_layers = 5
     
     cell_lstm = tf.contrib.rnn.BasicLSTMCell(number_of_filters)
     layer_lstm = tf.contrib.rnn.MultiRNNCell([cell_lstm for _ in range(number_of_lstm_layers)])
@@ -74,7 +74,7 @@ if __name__ == '__main__':
                                                              normalize=True)
     
     # train validate and test the model
-    epochs = 50
+    epochs = 25
     init = tf.global_variables_initializer()
 
     with tf.Session() as sess:

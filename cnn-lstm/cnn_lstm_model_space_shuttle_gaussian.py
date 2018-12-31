@@ -76,7 +76,7 @@ if __name__ == '__main__':
                                                              normalize=True)
     
     # train the model
-    epochs = 25
+    epochs = 50
     init = tf.global_variables_initializer()
 
     with tf.Session() as sess:
