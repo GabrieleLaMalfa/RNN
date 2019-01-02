@@ -20,8 +20,8 @@ if __name__ == '__main__':
     tf.reset_default_graph()
         
     batch_size = 1
-    sequence_len = 15
-    learning_rate = 5e-4
+    sequence_len = 10
+    learning_rate = 1e-3
     
     # define input/output pairs
     input_ = tf.placeholder(tf.float32, [batch_size, sequence_len])
@@ -33,7 +33,7 @@ if __name__ == '__main__':
     # define convolutional layer(s)
     kernel_size = 3
     number_of_channels = 1
-    number_of_filters = 35
+    number_of_filters = 50
     
     weights_conv = tf.Variable(tf.truncated_normal(shape=[kernel_size, 
                                                           number_of_channels,
@@ -76,7 +76,7 @@ if __name__ == '__main__':
                                                              normalize=True)
     
     # train the model
-    epochs = 150
+    epochs = 50
     init = tf.global_variables_initializer()
 
     with tf.Session() as sess:
@@ -131,7 +131,7 @@ if __name__ == '__main__':
 
         # anomalies' statistics
         errors_test = np.zeros(shape=len(y_test))
-        threshold = [scistats.norm.pdf(mean-3.*std, mean, std) for (mean, std) in zip(means_valid, stds_valid)]
+        threshold = [scistats.norm.pdf(mean-2.*std, mean, std) for (mean, std) in zip(means_valid, stds_valid)]
         anomalies = np.array([False for _ in range(len(y_test))])
         
         iter_ = 0

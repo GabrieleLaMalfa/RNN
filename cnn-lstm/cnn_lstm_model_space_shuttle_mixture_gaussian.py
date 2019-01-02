@@ -33,7 +33,7 @@ if __name__ == '__main__':
     # define convolutional layer(s)
     kernel_size = 10
     number_of_channels = 1
-    number_of_filters = 35
+    number_of_filters = 30
     
     weights_conv = tf.Variable(tf.truncated_normal(shape=[kernel_size, 
                                                           number_of_channels,
@@ -49,7 +49,7 @@ if __name__ == '__main__':
     layer_conv_flatten = tf.reshape(layer_conv, [batch_size, sequence_len, number_of_elements])
     
     # define lstm layer(s)
-    number_of_lstm_layers = 5
+    number_of_lstm_layers = 3
     
     cell_lstm = tf.contrib.rnn.BasicLSTMCell(number_of_filters)
     layer_lstm = tf.contrib.rnn.MultiRNNCell([cell_lstm for _ in range(number_of_lstm_layers)])
@@ -72,7 +72,7 @@ if __name__ == '__main__':
                                                              filename='data/space_shuttle_marotta_valve.csv', 
                                                              window=sequence_len, mode='validation', 
                                                              non_train_percentage=.3,
-                                                             val_rel_percentage=.6,
+                                                             val_rel_percentage=.5,
                                                              normalize=True)
     
     # train the model
