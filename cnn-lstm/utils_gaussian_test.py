@@ -30,4 +30,3 @@ def gaussian_test(data):
           "\n\nNormal test:", stats.normaltest(data), 
           "\n\nKolmogorov-Smirnov:", stats.kstest(data, 'norm'), 
           "\n\nAnderson test:", stats.anderson(data, 'norm'))
-    

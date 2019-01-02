@@ -136,7 +136,7 @@ if __name__ == '__main__':
         bin_errors_test = np.zeros(shape=anomaly_chunk_size)
         anomalies = list()
         alpha = 1e-3  # test significance
-        predictions = np.zeros(shape=y_test.shape)
+        predictions = np.zeros(shape=y_test.shape) 
         y_test = y_test[:x_test.shape[0]]
                     
         iter_ = 0

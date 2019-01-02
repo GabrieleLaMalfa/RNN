@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sat Dec 22 15:07:01 2018
+Created on Tue Jan  1 14:48:03 2019
 
 @author: Emanuele
 """
@@ -8,6 +8,7 @@ Created on Sat Dec 22 15:07:01 2018
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats as scistats
+from sklearn import mixture as mixture
 import tensorflow as tf
 
 import utils_topix as utils
@@ -18,9 +19,9 @@ if __name__ == '__main__':
     # reset computational graph
     tf.reset_default_graph()
         
-    batch_size = 10
-    sequence_len = 30
-    learning_rate = 1e-3
+    batch_size = 1
+    sequence_len = 15
+    learning_rate = 5e-4
     
     # define input/output pairs
     input_ = tf.placeholder(tf.float32, [batch_size, sequence_len])
@@ -30,16 +31,16 @@ if __name__ == '__main__':
     input_ = tf.expand_dims(input_, -1)
     
     # define convolutional layer(s)
-    kernel_size = 8
+    kernel_size = 3
     number_of_channels = 1
-    number_of_filters = 15
+    number_of_filters = 35
     
     weights_conv = tf.Variable(tf.truncated_normal(shape=[kernel_size, 
                                                           number_of_channels,
                                                           number_of_filters]))
     bias_conv = tf.Variable(tf.zeros(shape=[number_of_filters]))
     
-    layer_conv = tf.nn.conv1d(input_, filters=weights_conv, stride=1, padding='SAME')
+    layer_conv = tf.nn.conv1d(input_, filters=weights_conv, stride=1, padding='SAME')    
     layer_conv = tf.nn.relu(layer_conv)
     
     # flatten the output
@@ -64,18 +65,18 @@ if __name__ == '__main__':
     
     # loss evaluation
     loss = tf.losses.mean_squared_error(labels=target[-1], predictions=prediction[-1])
-    optimizer = tf.train.AdamOptimizer(learning_rate).minimize(loss)         
+    optimizer = tf.train.AdamOptimizer(learning_rate).minimize(loss)        
     
     # extract train and test
     x_train, y_train, x_valid, y_valid, x_test, y_test = utils.generate_batches(
-                                                             filename='data/space_shuttle_marotta_valve.csv', 
+                                                             filename='data/Topix_index.csv', 
                                                              window=sequence_len, mode='validation', 
                                                              non_train_percentage=.3,
-                                                             val_rel_percentage=.5,
+                                                             val_rel_percentage=.6,
                                                              normalize=True)
     
     # train the model
-    epochs = 50
+    epochs = 150
     init = tf.global_variables_initializer()
 
     with tf.Session() as sess:
@@ -109,18 +110,13 @@ if __name__ == '__main__':
             batch_y = y_valid[iter_*batch_size: (iter_+1)*batch_size, np.newaxis]
                 
             errors_valid[iter_] = sess.run(prediction-batch_y, feed_dict={input_: batch_x,
-                                                                 target: batch_y})[-1]
+                                                                          target: batch_y})[-1]
 
             iter_ +=  1
-        
-        # estimate mean and deviation of the errors' vector
-        #  since we have a batch size that may be different from 1 and we consider
-        #   the error of each last batch_y, we need to cut off the zero values
-        errors_valid = errors_valid[:iter_]
-        mean_valid, std_valid = (errors_valid.mean(), errors_valid.std())    
-        
+            
         # after the evaluation of the error on the validation, 
         #  we can safely backpropagate through the dataset
+        learning_rate = 1e-3
         iter_ = 0
         
         while iter_ < int(np.floor(x_valid.shape[0] / batch_size)):
@@ -131,6 +127,17 @@ if __name__ == '__main__':
             sess.run(optimizer, feed_dict={input_: batch_x, target: batch_y})
 
             iter_ +=  1
+        
+        # estimate mean and deviation of the errors' vector
+        #  since we have a batch size that may be different from 1 and we consider
+        #   the error of each last batch_y, we need to cut off the zero values
+        n_mixtures = 2
+        errors_valid = errors_valid[:iter_]
+        gaussian_mixture = mixture.GaussianMixture(n_components=n_mixtures)
+        gm = gaussian_mixture.fit(errors_valid.reshape(-1, 1))
+        means_valid = gm.means_[:,0]
+        stds_valid = gm.covariances_[:,0,0]**.5  # square it since it is the cov matrix
+        weights_valid = gm.weights_
                 
         # test
         predictions = np.zeros(shape=y_test.shape)
@@ -138,8 +145,8 @@ if __name__ == '__main__':
 
         # anomalies' statistics
         errors_test = np.zeros(shape=len(y_test))
-        threshold = scistats.norm.pdf(mean_valid-2.*std_valid, mean_valid, std_valid)
-        anomalies = np.zeros(shape=len(y_test))
+        threshold = [scistats.norm.pdf(mean-3.*std, mean, std) for (mean, std) in zip(means_valid, stds_valid)]
+        anomalies = np.array([False for _ in range(len(y_test))])
         
         iter_ = 0
         
@@ -150,14 +157,21 @@ if __name__ == '__main__':
                 
             predictions[iter_*batch_size:(iter_+1)*batch_size] = sess.run(prediction, feed_dict={input_: batch_x,
                                                                                                  target: batch_y}).flatten()
-    
+            
             for i in range(batch_size):
                 
-                errors_test[(iter_*batch_size)+i] = scistats.norm.pdf(predictions[(iter_*batch_size)+i]-batch_y[i], mean_valid, std_valid)
+                # evaluate Pr(Z=1|X) for each gaussian distribution
+                num = np.array([w*scistats.norm.pdf(predictions[(iter_*batch_size)+i]-batch_y[i], mean, std) for (mean, std, w) in zip(means_valid, stds_valid, weights_valid)])
+                den = np.sum(num)
+                
+                index = np.argmax(num/den)
+                errors_test[(iter_*batch_size)+i] = scistats.norm.pdf(predictions[(iter_*batch_size)+i]-batch_y[i], means_valid[index], stds_valid[index])
+                anomalies[(iter_*batch_size)+i] = (True if (errors_test[(iter_*batch_size)+i] < threshold[index]) else False)
             
             iter_ +=  1
+        
+        anomalies = np.argwhere(anomalies == True)
             
-        anomalies = np.argwhere(errors_test < threshold)
             
     # plot results
     fig, ax1 = plt.subplots()
