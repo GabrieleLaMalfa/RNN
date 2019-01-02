@@ -7,6 +7,7 @@ Created on Mon Dec 31 13:05:10 2018
 Test if a dataset follows a gaussian distribution.
 """
 
+import matplotlib.pyplot as plt
 import scipy.stats as stats
 
 
@@ -26,6 +27,10 @@ import scipy.stats as stats
 """ 
 def gaussian_test(data):
     
+    # plot histograms
+    plt.hist(data, bins=30)
+    
+    # gaussian's test
     print("\n\nShapiro:", stats.shapiro(data), 
           "\n\nNormal test:", stats.normaltest(data), 
           "\n\nKolmogorov-Smirnov:", stats.kstest(data, 'norm'), 

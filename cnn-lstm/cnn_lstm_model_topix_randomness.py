@@ -115,20 +115,7 @@ if __name__ == '__main__':
         #  since we have a batch size that may be different from 1 and we consider
         #   the error of each last batch_y, we need to cut off the zero values
         errors_valid = errors_valid[:iter_]
-        mean_valid = errors_valid.mean() 
-        
-        # after the evaluation of the error on the validation, 
-        #  we can safely backpropagate through the dataset
-        iter_ = 0
-        
-        while iter_ < int(np.floor(x_valid.shape[0] / batch_size)):
-    
-            batch_x = x_valid[iter_*batch_size: (iter_+1)*batch_size, :, np.newaxis]
-            batch_y = y_valid[iter_*batch_size: (iter_+1)*batch_size, np.newaxis]
-                
-            sess.run(optimizer, feed_dict={input_: batch_x, target: batch_y})
-
-            iter_ +=  1
+        mean_valid = errors_valid.mean()
                 
         # test
         anomaly_chunk_size = 25
