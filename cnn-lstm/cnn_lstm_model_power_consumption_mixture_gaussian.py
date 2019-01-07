@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Jan  2 13:56:22 2019
+Created on Thu Jan  3 14:20:30 2019
 
 @author: Emanuele
 """
@@ -20,8 +20,8 @@ if __name__ == '__main__':
     tf.reset_default_graph()
         
     batch_size = 5
-    sequence_len = 50
-    learning_rate = 1e-3
+    sequence_len = 15
+    learning_rate = 5e-4
     
     # define input/output pairs
     input_ = tf.placeholder(tf.float32, [batch_size, sequence_len])
@@ -31,9 +31,9 @@ if __name__ == '__main__':
     input_ = tf.expand_dims(input_, -1)
     
     # define convolutional layer(s)
-    kernel_size = 10
+    kernel_size = 3
     number_of_channels = 1
-    number_of_filters = 30
+    number_of_filters = 50
     
     weights_conv = tf.Variable(tf.truncated_normal(shape=[kernel_size, 
                                                           number_of_channels,
@@ -69,9 +69,9 @@ if __name__ == '__main__':
     
     # extract train and test
     x_train, y_train, x_valid, y_valid, x_test, y_test = utils.generate_batches(
-                                                             filename='data/space_shuttle_marotta_valve.csv', 
+                                                             filename='data/power_consumption.csv', 
                                                              window=sequence_len, mode='validation', 
-                                                             non_train_percentage=.3,
+                                                             non_train_percentage=.5,
                                                              val_rel_percentage=.5,
                                                              normalize=True)
     
@@ -117,7 +117,7 @@ if __name__ == '__main__':
         # estimate mean and deviation of the errors' vector
         #  since we have a batch size that may be different from 1 and we consider
         #   the error of each last batch_y, we need to cut off the zero values
-        n_mixtures = 2
+        n_mixtures = 3
         errors_valid = errors_valid[:iter_]
         gaussian_mixture = mixture.GaussianMixture(n_components=n_mixtures)
         gm = gaussian_mixture.fit(errors_valid.reshape(-1, 1))
@@ -131,7 +131,7 @@ if __name__ == '__main__':
 
         # anomalies' statistics
         errors_test = np.zeros(shape=len(y_test))
-        threshold = [scistats.norm.pdf(mean-3.*std, mean, std) for (mean, std) in zip(means_valid, stds_valid)]
+        threshold = [scistats.norm.pdf(mean-2.*std, mean, std) for (mean, std) in zip(means_valid, stds_valid)]
         anomalies = np.array([False for _ in range(len(y_test))])
         
         iter_ = 0

@@ -113,7 +113,8 @@ def generate_batches(filename,
                      mode='train-test', 
                      non_train_percentage=.7, 
                      val_rel_percentage=.5,
-                     normalize=False):
+                     normalize=False,
+                     temporal_difference=False):
     
     data = pd.read_csv(filename, delimiter=',', header=0)
     data = (data.iloc[:, 0]).values
@@ -121,6 +122,12 @@ def generate_batches(filename,
     if normalize is True:
         
         data = (data-np.min(data))/(np.max(data)-np.min(data))
+    
+    # if the flag is enabled, turn the dataset into the variation of each time 
+    #  step with the previous value (loose the firt sample)
+    if temporal_difference is True:
+        
+        data = data[:-1] - data[1:]
 
     if mode == 'train':
 

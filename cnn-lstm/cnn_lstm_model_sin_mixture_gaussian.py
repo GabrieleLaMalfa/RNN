@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Jan  2 13:56:22 2019
+Created on Sat Jan  5 09:40:38 2019
 
 @author: Emanuele
 """
@@ -19,8 +19,8 @@ if __name__ == '__main__':
     # reset computational graph
     tf.reset_default_graph()
         
-    batch_size = 5
-    sequence_len = 50
+    batch_size = 1
+    sequence_len = 10
     learning_rate = 1e-3
     
     # define input/output pairs
@@ -31,9 +31,9 @@ if __name__ == '__main__':
     input_ = tf.expand_dims(input_, -1)
     
     # define convolutional layer(s)
-    kernel_size = 10
+    kernel_size = 1
     number_of_channels = 1
-    number_of_filters = 30
+    number_of_filters = 1
     
     weights_conv = tf.Variable(tf.truncated_normal(shape=[kernel_size, 
                                                           number_of_channels,
@@ -49,7 +49,7 @@ if __name__ == '__main__':
     layer_conv_flatten = tf.reshape(layer_conv, [batch_size, sequence_len, number_of_elements])
     
     # define lstm layer(s)
-    number_of_lstm_layers = 3
+    number_of_lstm_layers = 1
     
     cell_lstm = tf.contrib.rnn.BasicLSTMCell(number_of_filters)
     layer_lstm = tf.contrib.rnn.MultiRNNCell([cell_lstm for _ in range(number_of_lstm_layers)])
@@ -69,14 +69,14 @@ if __name__ == '__main__':
     
     # extract train and test
     x_train, y_train, x_valid, y_valid, x_test, y_test = utils.generate_batches(
-                                                             filename='data/space_shuttle_marotta_valve.csv', 
+                                                             filename='data/sin.csv', 
                                                              window=sequence_len, mode='validation', 
                                                              non_train_percentage=.3,
-                                                             val_rel_percentage=.5,
+                                                             val_rel_percentage=.9,
                                                              normalize=True)
     
     # train the model
-    epochs = 25
+    epochs = 10
     init = tf.global_variables_initializer()
 
     with tf.Session() as sess:
@@ -131,7 +131,7 @@ if __name__ == '__main__':
 
         # anomalies' statistics
         errors_test = np.zeros(shape=len(y_test))
-        threshold = [scistats.norm.pdf(mean-3.*std, mean, std) for (mean, std) in zip(means_valid, stds_valid)]
+        threshold = [scistats.norm.pdf(mean-2.*std, mean, std) for (mean, std) in zip(means_valid, stds_valid)]
         anomalies = np.array([False for _ in range(len(y_test))])
         
         iter_ = 0

@@ -20,7 +20,7 @@ if __name__ == '__main__':
     tf.reset_default_graph()
         
     batch_size = 1
-    sequence_len = 10
+    sequence_len = 25
     learning_rate = 1e-3
     
     # define input/output pairs
@@ -31,9 +31,9 @@ if __name__ == '__main__':
     input_ = tf.expand_dims(input_, -1)
     
     # define convolutional layer(s)
-    kernel_size = 3
+    kernel_size = 5
     number_of_channels = 1
-    number_of_filters = 50
+    number_of_filters = 25
     
     weights_conv = tf.Variable(tf.truncated_normal(shape=[kernel_size, 
                                                           number_of_channels,
@@ -72,11 +72,11 @@ if __name__ == '__main__':
                                                              filename='data/Topix_index.csv', 
                                                              window=sequence_len, mode='validation', 
                                                              non_train_percentage=.3,
-                                                             val_rel_percentage=.6,
+                                                             val_rel_percentage=.8,
                                                              normalize=True)
     
     # train the model
-    epochs = 50
+    epochs = 35
     init = tf.global_variables_initializer()
 
     with tf.Session() as sess:
@@ -117,7 +117,7 @@ if __name__ == '__main__':
         # estimate mean and deviation of the errors' vector
         #  since we have a batch size that may be different from 1 and we consider
         #   the error of each last batch_y, we need to cut off the zero values
-        n_mixtures = 2
+        n_mixtures = 3
         errors_valid = errors_valid[:iter_]
         gaussian_mixture = mixture.GaussianMixture(n_components=n_mixtures)
         gm = gaussian_mixture.fit(errors_valid.reshape(-1, 1))
@@ -163,12 +163,12 @@ if __name__ == '__main__':
     fig, ax1 = plt.subplots()
 
     # plot data series
-    ax1.plot(y_test, 'b', label='index')
+    ax1.plot(y_test[:int(np.floor(x_test.shape[0] / batch_size))*batch_size], 'b', label='index')
     ax1.set_xlabel('Date')
     ax1.set_ylabel('TOPIX')
 
     # plot predictions
-    ax1.plot(predictions[:y_test.shape[0]-batch_size+1], 'r', label='prediction')
+    ax1.plot(predictions[:int(np.floor(x_test.shape[0] / batch_size))*batch_size], 'r', label='prediction')
     ax1.set_ylabel('Change Point')
     plt.legend(loc='best')
 

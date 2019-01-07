@@ -1,14 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Jan  2 13:56:22 2019
+Created on Fri Jan  4 13:00:01 2019
 
 @author: Emanuele
 """
 
 import matplotlib.pyplot as plt
 import numpy as np
-import scipy.stats as scistats
-from sklearn import mixture as mixture
 import tensorflow as tf
 
 import utils_topix as utils
@@ -19,7 +17,7 @@ if __name__ == '__main__':
     # reset computational graph
     tf.reset_default_graph()
         
-    batch_size = 5
+    batch_size = 10
     sequence_len = 50
     learning_rate = 1e-3
     
@@ -33,7 +31,7 @@ if __name__ == '__main__':
     # define convolutional layer(s)
     kernel_size = 10
     number_of_channels = 1
-    number_of_filters = 30
+    number_of_filters = 35
     
     weights_conv = tf.Variable(tf.truncated_normal(shape=[kernel_size, 
                                                           number_of_channels,
@@ -69,13 +67,13 @@ if __name__ == '__main__':
     
     # extract train and test
     x_train, y_train, x_valid, y_valid, x_test, y_test = utils.generate_batches(
-                                                             filename='data/space_shuttle_marotta_valve.csv', 
+                                                             filename='data/power_consumption.csv', 
                                                              window=sequence_len, mode='validation', 
-                                                             non_train_percentage=.3,
+                                                             non_train_percentage=.5,
                                                              val_rel_percentage=.5,
                                                              normalize=True)
     
-    # train the model
+    # train validate and test the model
     epochs = 25
     init = tf.global_variables_initializer()
 
@@ -86,12 +84,12 @@ if __name__ == '__main__':
         # train
         for e in range(epochs):
             
-            print("epoch", e+1)
+            print("epoch:", e+1)
             
             iter_ = 0
             
             while iter_ < int(np.floor(x_train.shape[0] / batch_size)):
-        
+                
                 batch_x = x_train[iter_*batch_size: (iter_+1)*batch_size, :, np.newaxis]
                 batch_y = y_train[iter_*batch_size: (iter_+1)*batch_size, np.newaxis]
                 
@@ -100,7 +98,7 @@ if __name__ == '__main__':
     
                 iter_ +=  1
 
-        # validation
+        # validation: calculate error and estimate its mean
         errors_valid = np.zeros(shape=len(x_valid))
         iter_ = 0
         
@@ -108,57 +106,56 @@ if __name__ == '__main__':
     
             batch_x = x_valid[iter_*batch_size: (iter_+1)*batch_size, :, np.newaxis]
             batch_y = y_valid[iter_*batch_size: (iter_+1)*batch_size, np.newaxis]
-                
-            errors_valid[iter_] = sess.run(prediction-batch_y, feed_dict={input_: batch_x,
-                                                                          target: batch_y})[-1]
+
+            errors_valid[iter_] = sess.run(prediction - batch_y, feed_dict={input_: batch_x,
+                                                                                    target: batch_y})[-1]
 
             iter_ +=  1
         
-        # estimate mean and deviation of the errors' vector
+        # estimate mean of the errors' vector
         #  since we have a batch size that may be different from 1 and we consider
         #   the error of each last batch_y, we need to cut off the zero values
-        n_mixtures = 2
         errors_valid = errors_valid[:iter_]
-        gaussian_mixture = mixture.GaussianMixture(n_components=n_mixtures)
-        gm = gaussian_mixture.fit(errors_valid.reshape(-1, 1))
-        means_valid = gm.means_[:,0]
-        stds_valid = gm.covariances_[:,0,0]**.5  # square it since it is the cov matrix
-        weights_valid = gm.weights_
+        mean_valid = errors_valid.mean() 
                 
         # test
-        predictions = np.zeros(shape=y_test.shape)
+        anomaly_chunk_size = 30
+        bin_errors_test = np.zeros(shape=anomaly_chunk_size)
+        anomalies = list()
+        alpha = 1e-3  # test significance
+        predictions = np.zeros(shape=y_test.shape) 
         y_test = y_test[:x_test.shape[0]]
-
-        # anomalies' statistics
-        errors_test = np.zeros(shape=len(y_test))
-        threshold = [scistats.norm.pdf(mean-3.*std, mean, std) for (mean, std) in zip(means_valid, stds_valid)]
-        anomalies = np.array([False for _ in range(len(y_test))])
-        
+                    
         iter_ = 0
         
         while iter_ < int(np.floor(x_test.shape[0] / batch_size)):
-    
+                
             batch_x = x_test[iter_*batch_size: (iter_+1)*batch_size, :, np.newaxis]
             batch_y = y_test[iter_*batch_size: (iter_+1)*batch_size, np.newaxis]
                 
             predictions[iter_*batch_size:(iter_+1)*batch_size] = sess.run(prediction, feed_dict={input_: batch_x,
                                                                                                  target: batch_y}).flatten()
-            
             for i in range(batch_size):
                 
-                # evaluate Pr(Z=1|X) for each gaussian distribution
-                num = np.array([w*scistats.norm.pdf(predictions[(iter_*batch_size)+i]-batch_y[i], mean, std) for (mean, std, w) in zip(means_valid, stds_valid, weights_valid)])
-                den = np.sum(num)
+                bin_errors_test[iter_%anomaly_chunk_size] = (0 if (predictions[(batch_size*iter_)+i]-batch_y[i]) >= mean_valid else 1)
+    
+            # test randomness of the prediciton: every chunk of anomaly_chunk_size
+            #  points is considered an anomaly if the related statistic supports 
+            #  the (null) hypotesis
+            if (iter_*batch_size % anomaly_chunk_size) == 0 and iter_ > 0:
                 
-                index = np.argmax(num/den)
-                errors_test[(iter_*batch_size)+i] = scistats.norm.pdf(predictions[(iter_*batch_size)+i]-batch_y[i], means_valid[index], stds_valid[index])
-                anomalies[(iter_*batch_size)+i] = (True if (errors_test[(iter_*batch_size)+i] < threshold[index]) else False)
-            
+                test_result = utils.random_test(bin_errors_test, alpha)
+                bin_errors_test *= 0  # reset the errors' vector for the next step
+                                
+                # append the anomalies' indices
+                if test_result is True:
+                    
+                    for j in range((batch_size*iter_)-anomaly_chunk_size, batch_size*iter_):
+                        
+                        anomalies.append(j) 
+
             iter_ +=  1
-        
-        anomalies = np.argwhere(anomalies == True)
-            
-            
+                        
     # plot results
     fig, ax1 = plt.subplots()
 

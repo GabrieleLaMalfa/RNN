@@ -160,12 +160,12 @@ if __name__ == '__main__':
     fig, ax1 = plt.subplots()
 
     # plot data series
-    ax1.plot(y_test, 'b', label='index')
+    ax1.plot(y_test[:int(np.floor(x_test.shape[0] / batch_size))*batch_size], 'b', label='index')
     ax1.set_xlabel('Date')
     ax1.set_ylabel('TOPIX')
 
     # plot predictions
-    ax1.plot(predictions[:y_test.shape[0]-batch_size+1], 'r', label='prediction')
+    ax1.plot(predictions[:int(np.floor(x_test.shape[0] / batch_size))*batch_size], 'r', label='prediction')
     ax1.set_ylabel('Change Point')
     plt.legend(loc='best')
 
