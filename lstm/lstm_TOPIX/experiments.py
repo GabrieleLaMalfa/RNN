@@ -13,9 +13,9 @@ import anomaly_detection as LSTM_exp
 
 if __name__ == '__main__':
 
-    DATA_PATH = 'TOPIX.csv'
+    DATA_PATH = 'TOPIX_index.csv'
 
-    results = LSTM_exp.lstm_exp(filename=DATA_PATH, num_units=256, window=3, batch_size=10,
+    results = LSTM_exp.lstm_exp(filename=DATA_PATH, num_units=256, window=1, batch_size=15,
                                 l_rate=1e-5, non_train_percentage=0.3, training_epochs=25,
                                 l_rate_test=.05, val_rel_percentage=.8)
 

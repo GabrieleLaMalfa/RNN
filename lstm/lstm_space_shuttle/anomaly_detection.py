@@ -10,7 +10,6 @@ Created on Sun Nov 11 09:13:10 2018
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from tensorflow.contrib import rnn
 
 
 def gaussian_pdf(x, mean, variance):

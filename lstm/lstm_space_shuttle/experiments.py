@@ -13,10 +13,10 @@ import anomaly_detection as LSTM_exp
 
 if __name__ == '__main__':
 
-    DATA_PATH = 'TOPIX.csv'
+    DATA_PATH = 'space_shuttle_marotta_valve.csv'
 
-    results = LSTM_exp.lstm_exp(filename=DATA_PATH, num_units=256, window=3, batch_size=10,
-                                l_rate=1e-5, non_train_percentage=0.3, training_epochs=25,
+    results = LSTM_exp.lstm_exp(filename=DATA_PATH, num_units=128, window=3, batch_size=5,
+                                l_rate=1e-5, non_train_percentage=0.3, training_epochs=10,
                                 l_rate_test=.05, val_rel_percentage=.8)
 
     # Anomaly detection
