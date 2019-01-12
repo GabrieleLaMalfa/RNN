@@ -7,6 +7,7 @@ Created on Sun Nov 11 09:13:10 2018
 
 # LSTM for Anomaly Detection
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -41,14 +42,28 @@ def series_to_matrix(series,
                   of data that has not been included in train (1-non_train_percentage) and assigned to validation
                   proportionally to val_rel_percentage.
 """
-def generate_batches(filename, window, mode='train-test', non_train_percentage=.7, val_rel_percentage=.5):
+def generate_batches(filename, 
+                     window, 
+                     mode='train-test', 
+                     non_train_percentage=.7, 
+                     val_rel_percentage=.5,
+                     normalize=False,
+                     time_difference=False):
 
     data = pd.read_csv(filename, delimiter=',', header=0)
     data = (data.iloc[:, 0]).values
 
     # normalize dataset (max-min method)
-    data = (data-np.min(data))/(np.max(data)-np.min(data))
-
+    if normalize is True:
+        
+        data = (data-np.min(data))/(np.max(data)-np.min(data))
+        
+    # if the flag 'time-difference' is enabled, turn the dataset into the variation of each time 
+    #  step with the previous value (loose the firt sample)
+    if time_difference is True:
+        
+        data = data[:-1] - data[1:]
+        
     if mode == 'train':
 
         y = data[window:]
@@ -96,9 +111,18 @@ def gaussian_anomaly_detection(input_, mean, variance, threshold):
     return anomaly, p_x
 
 
-def lstm_exp(filename, num_units, window, batch_size=3, l_rate=.01,
-             non_train_percentage=0.5, training_epochs=10, l_rate_test=.1,
-             val_rel_percentage=.7):
+def lstm_exp(filename, 
+             num_units, 
+             window, 
+             batch_size=3, 
+             l_rate=.01,
+             non_train_percentage=0.5, 
+             training_epochs=10, 
+             l_rate_test=.1,
+             val_rel_percentage=.7, 
+             normalize=False, 
+             time_difference=False):
+    
     # clear computational graph
     tf.reset_default_graph()
 
@@ -109,9 +133,14 @@ def lstm_exp(filename, num_units, window, batch_size=3, l_rate=.01,
     window = window
 
     # create input,output pairs
-    X, Y, X_val, Y_val, X_test, Y_test = generate_batches(filename=filename, window=window, mode='validation',
+    X, Y, X_val, Y_val, X_test, Y_test = generate_batches(filename=filename, 
+                                                          window=window, 
+                                                          mode='validation',
                                                           non_train_percentage=non_train_percentage,
-                                                          val_rel_percentage=val_rel_percentage)
+                                                          val_rel_percentage=val_rel_percentage,
+                                                          normalize=normalize,
+                                                          time_difference=time_difference)
+    
 
     # final dense layerdeclare variable shapes: weights and bias
     weights = tf.Variable(tf.random_normal([num_units, batch_size]))
@@ -183,9 +212,8 @@ def lstm_exp(filename, num_units, window, batch_size=3, l_rate=.01,
 
             # test
             elif e == epochs - 1:
-
+                                
                 print(" Test epoch:")
-
                 iter_test_ = 0
                 while iter_test_ < int(np.floor(X_test.shape[0] / batch_size)):
 

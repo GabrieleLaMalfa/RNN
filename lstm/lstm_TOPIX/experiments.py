@@ -7,6 +7,7 @@ Created on Sat Nov 24 15:27:05 2018
 
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.stats as scistats
 
 import anomaly_detection as LSTM_exp
 
@@ -15,28 +16,38 @@ if __name__ == '__main__':
 
     DATA_PATH = 'TOPIX_index.csv'
 
-    results = LSTM_exp.lstm_exp(filename=DATA_PATH, num_units=256, window=1, batch_size=15,
-                                l_rate=1e-5, non_train_percentage=0.3, training_epochs=25,
-                                l_rate_test=.05, val_rel_percentage=.8)
-
-    # Anomaly detection
-    anomaly_threshold = 5e-3  # /tau
+    results = LSTM_exp.lstm_exp(filename=DATA_PATH, 
+                                num_units=64, 
+                                window=1, 
+                                batch_size=1,
+                                l_rate=1e-4, 
+                                non_train_percentage=0.4, 
+                                training_epochs=2,
+                                l_rate_test=.05, 
+                                val_rel_percentage=.5,
+                                normalize=True,
+                                time_difference=False)
 
     # MLE on validation: estimate mean and variance
     val_errors = np.concatenate(results['Validation_Errors']).ravel()
     mean = np.mean(val_errors)
-    variance = np.var(val_errors)
+    std = np.std(val_errors)
+    
+    # Anomaly detection
+    sigma_threshold = 2.  # /tau
+    anomaly_threshold = scistats.norm.pdf(mean-sigma_threshold*std, mean, std)
 
     # turn test errors into a numpy array
     test_errors = np.concatenate(results['Test_Errors']).ravel()
 
     print("Anomalies detected with threshold: ", anomaly_threshold)
     list_anomalies = list()
+    
     for i in range(len(test_errors)):
 
-        tmp = LSTM_exp.gaussian_anomaly_detection(test_errors[i], mean, variance, anomaly_threshold)
+        tmp = scistats.norm.pdf(test_errors[i], mean, std)
 
-        if tmp[0] is True:
+        if tmp <= anomaly_threshold:
 
             print("\tPoint number ", i, " is an anomaly: P(x) is ", tmp[1])
             list_anomalies.append(i)
