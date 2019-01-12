@@ -18,11 +18,11 @@ if __name__ == '__main__':
 
     results = LSTM_exp.lstm_exp(filename=DATA_PATH, 
                                 num_units=64, 
-                                window=1, 
-                                batch_size=1,
+                                window=5, 
+                                batch_size=3,
                                 l_rate=1e-4, 
                                 non_train_percentage=0.4, 
-                                training_epochs=2,
+                                training_epochs=25,
                                 l_rate_test=.05, 
                                 val_rel_percentage=.5,
                                 normalize=True,
@@ -49,7 +49,7 @@ if __name__ == '__main__':
 
         if tmp <= anomaly_threshold:
 
-            print("\tPoint number ", i, " is an anomaly: P(x) is ", tmp[1])
+            print("\tPoint number ", i, " is an anomaly: P(x) is ", tmp)
             list_anomalies.append(i)
 
     # plot results

@@ -49,7 +49,7 @@ if __name__ == '__main__':
 
         if tmp <= anomaly_threshold:
 
-            print("\tPoint number ", i, " is an anomaly: P(x) is ", tmp[1])
+            print("\tPoint number ", i, " is an anomaly: P(x) is ", tmp)
             list_anomalies.append(i)
 
     # plot results

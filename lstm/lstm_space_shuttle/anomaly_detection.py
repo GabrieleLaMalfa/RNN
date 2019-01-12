@@ -119,7 +119,7 @@ def lstm_exp(filename,
              non_train_percentage=0.5, 
              training_epochs=10, 
              l_rate_test=.1,
-             val_rel_percentage=.7, 
+             val_rel_percentage=.7,
              normalize=False, 
              time_difference=False):
     
