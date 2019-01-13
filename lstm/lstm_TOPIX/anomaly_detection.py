@@ -149,18 +149,18 @@ def lstm_exp(filename,
     cells = tf.contrib.rnn.MultiRNNCell(lstm_layer)
     outputs, _ = tf.nn.dynamic_rnn(cells, x, dtype="float32")
 
-    # prediction
+    # dense layer: prediction
     y_hat = tf.matmul(tf.reshape(outputs, shape=(batch_size, num_units)), weights) + bias
     y_hat = tf.transpose(tf.reduce_sum(y_hat, axis=1, keepdims=True))
-    y_hat = tf.nn.sigmoid(y_hat)
+    y_hat = tf.nn.leaky_relu(y_hat)
+    
+    # calculate loss (sMAPE) and optimization algorithm
+    loss = 200*tf.reduce_mean(tf.abs(y_hat-y))/tf.reduce_mean(y_hat+y)
+    opt = tf.train.GradientDescentOptimizer(learning_rate=l_rate).minimize(loss)
 
-    # calculate loss and optimization algorithm
-    loss = tf.losses.mean_squared_error(labels=y, predictions=y_hat)
-    opt = tf.train.AdamOptimizer(learning_rate=l_rate).minimize(loss)
-
-    # estimate error as the distance (L1) between prediction and target
-    error = tf.abs(y_hat - y)
-
+    # estimate error as the difference between prediction and target
+    error = y_hat - y
+    
     init = tf.global_variables_initializer()
 
     with tf.Session() as sess:

@@ -17,12 +17,12 @@ if __name__ == '__main__':
     DATA_PATH = 'space_shuttle_marotta_valve.csv'
 
     results = LSTM_exp.lstm_exp(filename=DATA_PATH, 
-                                num_units=75, 
-                                window=10, 
+                                num_units=32, 
+                                window=1, 
                                 batch_size=1,
-                                l_rate=1e-3, 
+                                l_rate=1e-4, 
                                 non_train_percentage=0.5, 
-                                training_epochs=10,
+                                training_epochs=15,
                                 l_rate_test=.05, 
                                 val_rel_percentage=.5,
                                 normalize=True,
