@@ -7,7 +7,6 @@ Created on Sun Nov 11 09:13:10 2018
 
 # LSTM for Anomaly Detection
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -48,7 +47,8 @@ def generate_batches(filename,
                      non_train_percentage=.7, 
                      val_rel_percentage=.5,
                      normalize=False,
-                     time_difference=False):
+                     time_difference=False,
+                     td_method=None):
 
     data = pd.read_csv(filename, delimiter=',', header=0)
     data = (data.iloc[:, 0]).values
@@ -57,12 +57,19 @@ def generate_batches(filename,
     if normalize is True:
         
         data = (data-np.min(data))/(np.max(data)-np.min(data))
-        
+                
     # if the flag 'time-difference' is enabled, turn the dataset into the variation of each time 
     #  step with the previous value (loose the firt sample)
     if time_difference is True:
         
-        data = data[:-1] - data[1:]
+        if td_method is None:
+            
+            data = data[1:] - data[:-1]
+        
+        else:
+            
+            data = td_method(data+1e-5)
+            data = data[1:] - data[:-1]
         
     if mode == 'train':
 
@@ -121,7 +128,8 @@ def lstm_exp(filename,
              l_rate_test=.1,
              val_rel_percentage=.7,
              normalize=False, 
-             time_difference=False):
+             time_difference=False,
+             td_method=None):
     
     # clear computational graph
     tf.reset_default_graph()
@@ -139,7 +147,8 @@ def lstm_exp(filename,
                                                           non_train_percentage=non_train_percentage,
                                                           val_rel_percentage=val_rel_percentage,
                                                           normalize=normalize,
-                                                          time_difference=time_difference)
+                                                          time_difference=time_difference,
+                                                          td_method=td_method)
     
 
     # final dense layerdeclare variable shapes: weights and bias
@@ -158,11 +167,11 @@ def lstm_exp(filename,
     # prediction
     y_hat = tf.matmul(tf.reshape(outputs, shape=(batch_size, num_units)), weights) + bias
     y_hat = tf.transpose(tf.reduce_sum(y_hat, axis=1, keepdims=True))
-    y_hat = tf.nn.sigmoid(y_hat)
+    y_hat = tf.nn.tanh(y_hat)
 
     # calculate loss and optimization algorithm
     loss = tf.losses.mean_squared_error(labels=y, predictions=y_hat)
-    opt = tf.train.AdamOptimizer(learning_rate=l_rate).minimize(loss)
+    opt = tf.train.GradientDescentOptimizer(learning_rate=l_rate).minimize(loss)
 
     # estimate error as the distance (L1) between prediction and target
     error = tf.abs(y_hat - y)
@@ -232,5 +241,4 @@ def lstm_exp(filename,
                     "Y": plot_y, "Y_HAT": plot_y_hat,
                     "X_train": X, "Y_train": Y, "X_test": X_test, "Y_test": Y_test,
                     "Validation_Errors": list_validation_error, "Test_Errors": list_test_error}
-
     return dict_results
