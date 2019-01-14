@@ -151,7 +151,6 @@ def lstm_exp(filename,
 
     # dense layer: prediction
     y_hat = tf.matmul(tf.reshape(outputs, shape=(batch_size, num_units)), weights) + bias
-    y_hat = tf.transpose(tf.reduce_sum(y_hat, axis=1, keepdims=True))
     y_hat = tf.nn.leaky_relu(y_hat)
     
     # calculate loss (sMAPE) and optimization algorithm

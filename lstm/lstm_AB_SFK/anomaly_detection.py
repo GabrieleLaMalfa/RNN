@@ -136,6 +136,7 @@ def lstm_exp(filename,
                                                           non_train_percentage=non_train_percentage,
                                                           val_rel_percentage=val_rel_percentage)
 
+    print(X.shape, Y.shape, X_val.shape, Y_val.shape, X_test.shape, Y_test.shape)
     # final dense layerdeclare variable shapes: weights and bias
     weights = tf.Variable(tf.random_normal([num_units, batch_size]))
     bias = tf.Variable(tf.random_normal([1, batch_size]))
@@ -151,7 +152,6 @@ def lstm_exp(filename,
 
     # dense layer: prediction
     y_hat = tf.matmul(tf.reshape(outputs, shape=(batch_size, num_units)), weights) + bias
-    y_hat = tf.transpose(tf.reduce_sum(y_hat, axis=1, keepdims=True))
     y_hat = tf.nn.leaky_relu(y_hat)
     
     # calculate loss (sMAPE) and optimization algorithm
