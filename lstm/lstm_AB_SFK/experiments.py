@@ -17,16 +17,18 @@ if __name__ == '__main__':
     DATA_PATH = 'AB_SKF.csv'
 
     results = LSTM_exp.lstm_exp(filename=DATA_PATH, 
-                                num_units=64, 
-                                window=1, 
+                                num_units=80, 
+                                window=5,
+                                stride=3,
                                 batch_size=1,
-                                l_rate=1e-4, 
-                                non_train_percentage=0.4, 
-                                training_epochs=2,
+                                l_rate=1e-2, 
+                                non_train_percentage=0.5, 
+                                training_epochs=25,
                                 l_rate_test=.05, 
                                 val_rel_percentage=.5,
                                 normalize=True,
-                                time_difference=False)
+                                time_difference=True,
+                                td_method=None)
 
     # MLE on validation: estimate mean and variance
     val_errors = np.concatenate(results['Validation_Errors']).ravel()
@@ -34,7 +36,7 @@ if __name__ == '__main__':
     std = np.std(val_errors)
     
     # Anomaly detection
-    sigma_threshold = 2.  # /tau
+    sigma_threshold = 2.5  # /tau
     anomaly_threshold = scistats.norm.pdf(mean-sigma_threshold*std, mean, std)
 
     # turn test errors into a numpy array
@@ -60,11 +62,11 @@ if __name__ == '__main__':
     # plot data series
     ax1.plot(plot_y, 'b', label='index')
     ax1.set_xlabel('Date')
-    ax1.set_ylabel('TOPIX')
+    ax1.set_ylabel('Space Shuttle')
 
     # plot predictions
     ax1.plot(plot_y_hat, 'r', label='prediction')
-    ax1.set_ylabel('Change Point')
+    ax1.set_ylabel('Prediction')
     plt.legend(loc='best')
 
 #    # plot anomaly's likelihood
@@ -80,3 +82,32 @@ if __name__ == '__main__':
     plt.show()
     
     print("Total test error:", np.sum(np.abs(results['Test_Errors'])))
+    
+    # plot reconstructed signal
+    tot_y = 0.
+    tot_y_hat = 0.
+    recovered_plot_y = np.zeros(shape=len(plot_y_hat)+1)
+    recovered_plot_y_hat = np.zeros(shape=len(plot_y_hat)+1)
+    for i in range(1, len(recovered_plot_y)):
+        
+        recovered_plot_y[i] = tot_y
+        recovered_plot_y_hat[i] = tot_y_hat
+        
+        tot_y += plot_y[i-1]
+        tot_y_hat += plot_y_hat[i-1] 
+                
+    fig, ax1 = plt.subplots()
+
+    # plot data series
+    ax1.plot(recovered_plot_y, 'b', label='index')
+    ax1.set_xlabel('RECONSTRUCTION: Date')
+    ax1.set_ylabel('Space Shuttle')
+
+    # plot predictions
+    ax1.plot(recovered_plot_y_hat, 'r', label='prediction')
+    ax1.set_ylabel('RECONSTRUCTION: Prediction')
+    plt.legend(loc='best')
+
+    fig.tight_layout()
+    plt.show()
+    

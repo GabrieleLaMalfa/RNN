@@ -205,32 +205,48 @@ def lstm_exp(filename,
     # final dense layerdeclare variable shapes: weights and bias
     weights = tf.get_variable('weights', 
                               shape=[num_units, batch_size, batch_size], 
-                              initializer=tf.contrib.layers.xavier_initializer())
+                              initializer=tf.truncated_normal_initializer())
     bias = tf.get_variable('bias', 
                            shape=[1, batch_size], 
-                           initializer=tf.contrib.layers.xavier_initializer())
+                           initializer=tf.truncated_normal_initializer())
 
     # placeholders (input)
     x = tf.placeholder("float", [None, batch_size, window])
     y = tf.placeholder("float", [None, batch_size])  # dims of target
 
     # define layers
+    # initialize the state (zeros or normal or uniform distributed)
+    initial_state = tf.placeholder(dtype='float32', shape=(batch_size, 2, 1, num_units))
+#    initial_state = tf.random_normal(shape=tf.shape(initial_state))
+#    initial_state = tf.random_uniform(shape=tf.shape(initial_state), minval=-1e-3, maxval=1e3)
+    initial_state = tf.zeros_like(initial_state)
+    l = tf.unstack(initial_state, axis=0)
+    rnn_tuple_state = tuple(
+             [tf.nn.rnn_cell.LSTMStateTuple(l[idx][0],l[idx][1])
+              for idx in range(batch_size)])
+
+    # define the LSTM cells
     lstm_layer = [tf.nn.rnn_cell.LSTMCell(num_units, 
-                                          cell_clip=1e10,
-                                          forget_bias=.0,
+                                          forget_bias=1.,
                                           state_is_tuple=True,
                                           activation=tf.nn.tanh,
                                           initializer=tf.contrib.layers.xavier_initializer()) for _ in range(batch_size)]
     cells = tf.contrib.rnn.MultiRNNCell(lstm_layer)
-    outputs, _ = tf.nn.dynamic_rnn(cells, x, dtype="float32")
+    outputs, _ = tf.nn.dynamic_rnn(cells, 
+                                   x, 
+                                   initial_state=rnn_tuple_state,
+                                   dtype="float32")
 
     # dense layer: prediction
     y_hat = tf.tensordot(tf.reshape(outputs, shape=(batch_size, num_units)), weights, 2) + bias
-    y_hat = tf.nn.tanh(y_hat)
+#    y_hat = tf.nn.sigmoid(y_hat)
     
-    # calculate loss (L2 or sMAPE) and optimization algorithm
-#    loss = (1/batch_size)*tf.reduce_mean(tf.abs(y-y_hat))/tf.reduce_mean(y+y_hat)
-    loss = tf.reduce_sum(tf.pow(y-y_hat, 2))
+    # calculate loss (L2, MSE, huber, hinge or sMAPE, leave uncommented one of them) and optimization algorithm
+#    loss = tf.nn.l2_loss(y-y_hat)
+#    loss = tf.losses.mean_squared_error(y, y_hat)
+    loss = tf.losses.huber_loss(y, y_hat, weights=.2)
+#    loss = tf.losses.hinge_loss(y, y_hat)
+#    loss = (200/batch_size)*tf.reduce_mean(tf.abs(y-y_hat))/tf.reduce_mean(y+y_hat)
     opt = tf.train.GradientDescentOptimizer(learning_rate=l_rate).minimize(loss)
 
     # estimate error as the difference between prediction and target

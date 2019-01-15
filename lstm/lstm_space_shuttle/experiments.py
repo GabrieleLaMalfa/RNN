@@ -17,11 +17,11 @@ if __name__ == '__main__':
     DATA_PATH = 'space_shuttle_marotta_valve.csv'
 
     results = LSTM_exp.lstm_exp(filename=DATA_PATH, 
-                                num_units=32, 
-                                window=3,
+                                num_units=80, 
+                                window=5,
                                 stride=3,
                                 batch_size=1,
-                                l_rate=2e-3, 
+                                l_rate=1e-2, 
                                 non_train_percentage=0.5, 
                                 training_epochs=25,
                                 l_rate_test=.05, 
@@ -36,7 +36,7 @@ if __name__ == '__main__':
     std = np.std(val_errors)
     
     # Anomaly detection
-    sigma_threshold = 2.  # /tau
+    sigma_threshold = 2.5  # /tau
     anomaly_threshold = scistats.norm.pdf(mean-sigma_threshold*std, mean, std)
 
     # turn test errors into a numpy array

@@ -42,12 +42,14 @@ def series_to_matrix(series,
                   proportionally to val_rel_percentage.
 """
 def generate_batches(filename, 
-                     window, 
+                     window,
+                     stride=1,
                      mode='train-test', 
                      non_train_percentage=.7, 
                      val_rel_percentage=.5,
                      normalize=False,
-                     time_difference=False):
+                     time_difference=False,
+                     td_method=None):
 
     data = pd.read_csv(filename, delimiter=',', header=0)
     data = (data.iloc[:, 0]).values
@@ -56,46 +58,73 @@ def generate_batches(filename,
     if normalize is True:
         
         data = (data-np.min(data))/(np.max(data)-np.min(data))
-        
+                
     # if the flag 'time-difference' is enabled, turn the dataset into the variation of each time 
     #  step with the previous value (loose the firt sample)
     if time_difference is True:
         
-        data = data[1:] - data[:-1]
+        if td_method is None:
+            
+            data = data[1:] - data[:-1]
+        
+        else:
+            
+            data = td_method(data+1e-5)
+            data = data[1:] - data[:-1]
         
     if mode == 'train':
 
-        y = data[window:]
-        x = series_to_matrix(data, window, 1)[:-1]
+        y = series_to_matrix(data[window:], 1, stride)
+        x = series_to_matrix(data, window, stride)
+        
+        if stride == 1 or window == 1:
+            
+            x = x[:-1]
 
         return x, y
 
     elif mode == 'train-test':
 
-        train_size = int((1 - non_train_percentage) * np.ceil(len(data)))
-        y_train = data[window:train_size]
-        x_train = series_to_matrix(data, window, 1)[:train_size - window]
-        y_test = data[train_size:]
-        x_test = series_to_matrix(data, window, 1)[train_size:]
+        train_size = int(np.ceil((1 - non_train_percentage) * len(data)))
+        train = data[:train_size]; test = data[train_size:]
+        
+        y_train = series_to_matrix(train[window:], 1, stride)
+        x_train = series_to_matrix(train, window, stride)       
+        
+        y_test = series_to_matrix(test[window:], 1, stride)
+        x_test = series_to_matrix(test, window, stride)
+        
+        if stride == 1 or window == 1:
+            
+            x_train = x_train[:-1]; x_test = x_test[:-1]
 
         return x_train, y_train, x_test, y_test
 
     elif mode == 'validation':
 
         # split between train and validation+test
-        train_size = int((1 - non_train_percentage) * np.ceil(len(data)))
-        y_train = data[window:train_size]
-        x_train = series_to_matrix(data, window, 1)[:train_size - window]
+        train_size = int(np.ceil((1 - non_train_percentage) * len(data)))
+        train = data[:train_size]
+        
+        y_train = series_to_matrix(train[window:], 1, stride)
+        x_train = series_to_matrix(train, window, stride)
 
         # split validation+test into validation and test
         validation_size = int(val_rel_percentage * np.ceil(len(data) * non_train_percentage))
-        y_val = data[train_size:train_size + validation_size]
-        x_val = series_to_matrix(data, window, 1)[train_size - window:train_size + validation_size - window]
-        y_test = data[train_size + validation_size:]
-        x_test = series_to_matrix(data, window, 1)[train_size + validation_size - window:-window]
+        val = data[train_size:validation_size+train_size]; test = data[validation_size+train_size:]
+
+        y_val = series_to_matrix(val[window:], 1, stride)
+        x_val = series_to_matrix(val, window, stride)
+        
+        y_test = series_to_matrix(test[window:], 1, stride)
+        x_test = series_to_matrix(test, window, stride)
+        
+        if stride == 1 or window == 1:
+            
+            x_train = x_train[:-1]; x_test = x_test[:-1]; x_val = x_val[:-1]
 
         return x_train, y_train, x_val, y_val, x_test, y_test
-    
+
 
 def gaussian_anomaly_detection(input_, mean, variance, threshold):
 
@@ -112,15 +141,17 @@ def gaussian_anomaly_detection(input_, mean, variance, threshold):
 
 def lstm_exp(filename, 
              num_units, 
-             window, 
+             window,
+             stride=1,
              batch_size=3, 
              l_rate=.01,
              non_train_percentage=0.5, 
              training_epochs=10, 
              l_rate_test=.1,
-             val_rel_percentage=.7, 
+             val_rel_percentage=.7,
              normalize=False, 
-             time_difference=False):
+             time_difference=False,
+             td_method=None):
     
     # clear computational graph
     tf.reset_default_graph()
@@ -132,34 +163,95 @@ def lstm_exp(filename,
     window = window
 
     # create input,output pairs
-    X, Y, X_val, Y_val, X_test, Y_test = generate_batches(filename=filename, window=window, mode='validation',
+    X, Y, X_val, Y_val, X_test, Y_test = generate_batches(filename=filename, 
+                                                          window=window, 
+                                                          stride=stride,
+                                                          mode='validation',
                                                           non_train_percentage=non_train_percentage,
-                                                          val_rel_percentage=val_rel_percentage)
+                                                          val_rel_percentage=val_rel_percentage,
+                                                          normalize=normalize,
+                                                          time_difference=time_difference,
+                                                          td_method=td_method)
+    
+
+    # suppress second axis on Y values (the algorithms expects shapes like (n,) for the prediction)
+    Y = Y[:,0]; Y_val = Y_val[:,0]; Y_test = Y_test[:,0]
+    
+    # if the dimensions mismatch (somehow, due tu bugs in generate_batches function,
+    #  make them match)
+    mismatch = False
+    
+    if len(X) > len(Y):
+        
+        X = X_val[:len(Y)]
+        mismatch = True
+    
+    if len(X_val) > len(Y_val):
+        
+        X_val = X_val[:len(Y_val)]
+        mismatch = True
+    
+    if len(X_test) > len(Y_test):
+        
+        X_test = X_test[:len(Y_test)]
+        mismatch = True
+    
+    if mismatch is True: 
+        
+        print("Mismatched dimensions due to generate batches: this will be corrected automatically.")
+        
+    print("Datasets shapes: ", X.shape, Y.shape, X_val.shape, Y_val.shape, X_test.shape, Y_test.shape)
 
     # final dense layerdeclare variable shapes: weights and bias
-    weights = tf.Variable(tf.random_normal([num_units, batch_size]))
-    bias = tf.Variable(tf.random_normal([1, batch_size]))
+    weights = tf.get_variable('weights', 
+                              shape=[num_units, batch_size, batch_size], 
+                              initializer=tf.truncated_normal_initializer())
+    bias = tf.get_variable('bias', 
+                           shape=[1, batch_size], 
+                           initializer=tf.truncated_normal_initializer())
 
     # placeholders (input)
     x = tf.placeholder("float", [None, batch_size, window])
     y = tf.placeholder("float", [None, batch_size])  # dims of target
 
     # define layers
-    lstm_layer = [tf.nn.rnn_cell.LSTMCell(num_units, state_is_tuple=True) for _ in range(batch_size)]
+    # initialize the state (zeros or normal or uniform distributed)
+    initial_state = tf.placeholder(dtype='float32', shape=(batch_size, 2, 1, num_units))
+#    initial_state = tf.random_normal(shape=tf.shape(initial_state))
+#    initial_state = tf.random_uniform(shape=tf.shape(initial_state), minval=-1e-3, maxval=1e3)
+    initial_state = tf.zeros_like(initial_state)
+    l = tf.unstack(initial_state, axis=0)
+    rnn_tuple_state = tuple(
+             [tf.nn.rnn_cell.LSTMStateTuple(l[idx][0],l[idx][1])
+              for idx in range(batch_size)])
+
+    # define the LSTM cells
+    lstm_layer = [tf.nn.rnn_cell.LSTMCell(num_units, 
+                                          forget_bias=1.,
+                                          state_is_tuple=True,
+                                          activation=tf.nn.tanh,
+                                          initializer=tf.contrib.layers.xavier_initializer()) for _ in range(batch_size)]
     cells = tf.contrib.rnn.MultiRNNCell(lstm_layer)
-    outputs, _ = tf.nn.dynamic_rnn(cells, x, dtype="float32")
+    outputs, _ = tf.nn.dynamic_rnn(cells, 
+                                   x, 
+                                   initial_state=rnn_tuple_state,
+                                   dtype="float32")
 
     # dense layer: prediction
-    y_hat = tf.matmul(tf.reshape(outputs, shape=(batch_size, num_units)), weights) + bias
-    y_hat = tf.nn.leaky_relu(y_hat)
+    y_hat = tf.tensordot(tf.reshape(outputs, shape=(batch_size, num_units)), weights, 2) + bias
+#    y_hat = tf.nn.sigmoid(y_hat)
     
-    # calculate loss (sMAPE) and optimization algorithm
-    loss = 200*tf.reduce_mean(tf.abs(y_hat-y))/tf.reduce_mean(y_hat+y)
+    # calculate loss (L2, MSE, huber, hinge or sMAPE, leave uncommented one of them) and optimization algorithm
+#    loss = tf.nn.l2_loss(y-y_hat)
+#    loss = tf.losses.mean_squared_error(y, y_hat)
+    loss = tf.losses.huber_loss(y, y_hat, weights=.2)
+#    loss = tf.losses.hinge_loss(y, y_hat)
+#    loss = (200/batch_size)*tf.reduce_mean(tf.abs(y-y_hat))/tf.reduce_mean(y+y_hat)
     opt = tf.train.GradientDescentOptimizer(learning_rate=l_rate).minimize(loss)
 
     # estimate error as the difference between prediction and target
     error = y_hat - y
-    
+
     init = tf.global_variables_initializer()
 
     with tf.Session() as sess:
@@ -205,9 +297,8 @@ def lstm_exp(filename,
 
             # test
             elif e == epochs - 1:
-
+                                
                 print(" Test epoch:")
-
                 iter_test_ = 0
                 while iter_test_ < int(np.floor(X_test.shape[0] / batch_size)):
 
@@ -226,5 +317,4 @@ def lstm_exp(filename,
                     "Y": plot_y, "Y_HAT": plot_y_hat,
                     "X_train": X, "Y_train": Y, "X_test": X_test, "Y_test": Y_test,
                     "Validation_Errors": list_validation_error, "Test_Errors": list_test_error}
-
     return dict_results
