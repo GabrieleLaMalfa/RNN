@@ -17,7 +17,7 @@ if __name__ == '__main__':
     DATA_PATH = 'TOPIX_index.csv'
 
     results = LSTM_exp.lstm_exp(filename=DATA_PATH, 
-                                num_units=80, 
+                                num_units=50, 
                                 window=5,
                                 stride=3,
                                 batch_size=1,

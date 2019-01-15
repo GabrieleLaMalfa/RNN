@@ -250,7 +250,7 @@ def lstm_exp(filename,
     opt = tf.train.GradientDescentOptimizer(learning_rate=l_rate).minimize(loss)
 
     # estimate error as the difference between prediction and target
-    error = y_hat - y
+    error = y - y_hat
 
     init = tf.global_variables_initializer()
 
