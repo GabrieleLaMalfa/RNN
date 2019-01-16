@@ -21,6 +21,7 @@ if __name__ == '__main__':
         
     batch_size = 5
     sequence_len = 50
+    stride = 2
     learning_rate = 1e-3
     
     # define input/output pairs
@@ -70,10 +71,42 @@ if __name__ == '__main__':
     # extract train and test
     x_train, y_train, x_valid, y_valid, x_test, y_test = utils.generate_batches(
                                                              filename='data/space_shuttle_marotta_valve.csv', 
-                                                             window=sequence_len, mode='validation', 
+                                                             window=sequence_len,
+                                                             stride=stride,
+                                                             mode='validation', 
                                                              non_train_percentage=.3,
                                                              val_rel_percentage=.5,
-                                                             normalize=True)
+                                                             normalize=True,
+                                                             time_difference=True,
+                                                             td_method=None)
+    
+    # suppress second axis on Y values (the algorithms expects shapes like (n,) for the prediction)
+    y_train = y_train[:,0]; y_valid = y_valid[:,0]; y_test = y_test[:,0]
+    
+    # if the dimensions mismatch (somehow, due tu bugs in generate_batches function,
+    #  make them match)
+    mismatch = False
+    
+    if len(x_train) > len(y_train):
+        
+        x_train = x_train[:len(y_train)]
+        mismatch = True
+    
+    if len(x_valid) > len(y_valid):
+        
+        x_valid = x_valid[:len(y_valid)]
+        mismatch = True
+    
+    if len(x_test) > len(y_test):
+        
+        x_test = x_test[:len(y_test)]
+        mismatch = True
+    
+    if mismatch is True: 
+        
+        print("Mismatched dimensions due to generate batches: this will be corrected automatically.")
+        
+    print("Datasets shapes: ", X.shape, Y.shape, X_val.shape, Y_val.shape, X_test.shape, Y_test.shape)
     
     # train the model
     epochs = 25

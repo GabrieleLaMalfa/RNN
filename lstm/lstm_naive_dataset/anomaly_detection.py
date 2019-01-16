@@ -172,7 +172,7 @@ def lstm_exp(filename,
                                                           normalize=normalize,
                                                           time_difference=time_difference,
                                                           td_method=td_method)
-    
+        
 
     # suppress second axis on Y values (the algorithms expects shapes like (n,) for the prediction)
     Y = Y[:,0]; Y_val = Y_val[:,0]; Y_test = Y_test[:,0]
@@ -183,7 +183,7 @@ def lstm_exp(filename,
     
     if len(X) > len(Y):
         
-        X = X_val[:len(Y)]
+        X = X[:len(Y)]
         mismatch = True
     
     if len(X_val) > len(Y_val):

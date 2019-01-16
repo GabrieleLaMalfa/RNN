@@ -101,7 +101,7 @@ def series_to_matrix(series, k_shape, striding=1):
 
 
 """
- 3 modes are possible and need do be specified in 'mode' variable:
+ 3 split-techinques are possible and need do be specified in 'mode' variable:
     'train': all data is reserved to train;
     'train-test': split between train and test, according to non_train_percentage;
     'validation': data is split among train, test and validation: their percentage is chosen according to the percantge
@@ -109,56 +109,86 @@ def series_to_matrix(series, k_shape, striding=1):
                   proportionally to val_rel_percentage.
 """
 def generate_batches(filename, 
-                     window, 
+                     window,
+                     stride=1,
                      mode='train-test', 
                      non_train_percentage=.7, 
                      val_rel_percentage=.5,
                      normalize=False,
-                     temporal_difference=False):
-    
+                     time_difference=False,
+                     td_method=None):
+
     data = pd.read_csv(filename, delimiter=',', header=0)
     data = (data.iloc[:, 0]).values
-    
+
+    # normalize dataset (max-min method)
     if normalize is True:
         
         data = (data-np.min(data))/(np.max(data)-np.min(data))
-    
-    # if the flag is enabled, turn the dataset into the variation of each time 
+                
+    # if the flag 'time-difference' is enabled, turn the dataset into the variation of each time 
     #  step with the previous value (loose the firt sample)
-    if temporal_difference is True:
+    if time_difference is True:
         
-        data = data[1:] - data[:-1]
-
+        if td_method is None:
+            
+            data = data[1:] - data[:-1]
+        
+        else:
+            
+            data = td_method(data+1e-5)
+            data = data[1:] - data[:-1]
+        
     if mode == 'train':
 
-        y = data[window:]
-        x = series_to_matrix(data, window, 1)[:-1]
+        y = series_to_matrix(data[window:], 1, stride)
+        x = series_to_matrix(data, window, stride)
+        
+        if stride == 1 or window == 1:
+            
+            x = x[:-1]
 
         return x, y
 
     elif mode == 'train-test':
 
-        train_size = int((1 - non_train_percentage) * np.ceil(len(data)))
-        y_train = data[window:train_size]
-        x_train = series_to_matrix(data, window, 1)[:train_size - window]
-        y_test = data[train_size:]
-        x_test = series_to_matrix(data, window, 1)[train_size:]
+        train_size = int(np.ceil((1 - non_train_percentage) * len(data)))
+        train = data[:train_size]; test = data[train_size:]
+        
+        y_train = series_to_matrix(train[window:], 1, stride)
+        x_train = series_to_matrix(train, window, stride)       
+        
+        y_test = series_to_matrix(test[window:], 1, stride)
+        x_test = series_to_matrix(test, window, stride)
+        
+        if stride == 1 or window == 1:
+            
+            x_train = x_train[:-1]; x_test = x_test[:-1]
 
         return x_train, y_train, x_test, y_test
 
     elif mode == 'validation':
 
         # split between train and validation+test
-        train_size = int((1 - non_train_percentage) * np.ceil(len(data)))
-        y_train = data[window:train_size]
-        x_train = series_to_matrix(data, window, 1)[:train_size - window]
+        train_size = int(np.ceil((1 - non_train_percentage) * len(data)))
+        train = data[:train_size]
+        
+        y_train = series_to_matrix(train[window:], 1, stride)
+        x_train = series_to_matrix(train, window, stride)
 
         # split validation+test into validation and test
         validation_size = int(val_rel_percentage * np.ceil(len(data) * non_train_percentage))
-        y_val = data[train_size:train_size + validation_size]
-        x_val = series_to_matrix(data, window, 1)[train_size - window:train_size + validation_size - window]
-        y_test = data[train_size + validation_size:]
-        x_test = series_to_matrix(data, window, 1)[train_size + validation_size - window:-window]
+        val = data[train_size:validation_size+train_size]; test = data[validation_size+train_size:]
+
+        y_val = series_to_matrix(val[window:], 1, stride)
+        x_val = series_to_matrix(val, window, stride)
+        
+        y_test = series_to_matrix(test[window:], 1, stride)
+        x_test = series_to_matrix(test, window, stride)
+        
+        if stride == 1 or window == 1:
+            
+            x_train = x_train[:-1]; x_test = x_test[:-1]; x_val = x_val[:-1]
 
         return x_train, y_train, x_val, y_val, x_test, y_test
     

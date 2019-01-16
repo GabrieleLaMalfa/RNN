@@ -17,7 +17,7 @@ if __name__ == '__main__':
     DATA_PATH = 'naive_dataset.csv'
 
     results = LSTM_exp.lstm_exp(filename=DATA_PATH, 
-                                num_units=50, 
+                                num_units=100, 
                                 window=10,
                                 stride=3,
                                 batch_size=10,

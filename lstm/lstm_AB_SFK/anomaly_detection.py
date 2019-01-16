@@ -183,7 +183,7 @@ def lstm_exp(filename,
     
     if len(X) > len(Y):
         
-        X = X_val[:len(Y)]
+        X = X[:len(Y)]
         mismatch = True
     
     if len(X_val) > len(Y_val):
