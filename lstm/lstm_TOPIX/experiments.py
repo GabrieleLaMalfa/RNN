@@ -18,12 +18,12 @@ if __name__ == '__main__':
 
     results = LSTM_exp.lstm_exp(filename=DATA_PATH, 
                                 num_units=50, 
-                                window=5,
+                                window=10,
                                 stride=3,
-                                batch_size=1,
+                                batch_size=10,
                                 l_rate=1e-2, 
                                 non_train_percentage=0.5, 
-                                training_epochs=25,
+                                training_epochs=5,
                                 l_rate_test=.05, 
                                 val_rel_percentage=.5,
                                 normalize=True,
@@ -36,7 +36,7 @@ if __name__ == '__main__':
     std = np.std(val_errors)
     
     # Anomaly detection
-    sigma_threshold = 2.5  # /tau
+    sigma_threshold = 3.  # /tau
     anomaly_threshold = scistats.norm.pdf(mean-sigma_threshold*std, mean, std)
 
     # turn test errors into a numpy array
@@ -60,6 +60,7 @@ if __name__ == '__main__':
     fig, ax1 = plt.subplots()
 
     # plot data series
+    print("\nPrediction:")
     ax1.plot(plot_y, 'b', label='index')
     ax1.set_xlabel('Date')
     ax1.set_ylabel('Space Shuttle')
@@ -99,6 +100,7 @@ if __name__ == '__main__':
     fig, ax1 = plt.subplots()
 
     # plot data series
+    print("\nReconstruction:")
     ax1.plot(recovered_plot_y, 'b', label='index')
     ax1.set_xlabel('RECONSTRUCTION: Date')
     ax1.set_ylabel('Space Shuttle')
@@ -110,4 +112,8 @@ if __name__ == '__main__':
 
     fig.tight_layout()
     plt.show()
+    
+    # errors on test
+    print("\nTest errors:")
+    plt.plot(np.array(results['Test_Errors']).ravel())
     

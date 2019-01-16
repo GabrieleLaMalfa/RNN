@@ -211,30 +211,20 @@ def lstm_exp(filename,
                            initializer=tf.truncated_normal_initializer())
 
     # placeholders (input)
-    x = tf.placeholder("float", [None, batch_size, window])
-    y = tf.placeholder("float", [None, batch_size])  # dims of target
-
-    # define layers
-    # initialize the state (zeros or normal or uniform distributed)
-    initial_state = tf.placeholder(dtype='float32', shape=(batch_size, 2, 1, num_units))
-#    initial_state = tf.random_normal(shape=tf.shape(initial_state))
-#    initial_state = tf.random_uniform(shape=tf.shape(initial_state), minval=-1e-3, maxval=1e3)
-    initial_state = tf.zeros_like(initial_state)
-    l = tf.unstack(initial_state, axis=0)
-    rnn_tuple_state = tuple(
-             [tf.nn.rnn_cell.LSTMStateTuple(l[idx][0],l[idx][1])
-              for idx in range(batch_size)])
+    x = tf.placeholder("float", [None, batch_size, window]) # (time, batch, input)
+    y = tf.placeholder("float", [None, batch_size])  # (batch, output)
 
     # define the LSTM cells
-    lstm_layer = [tf.nn.rnn_cell.LSTMCell(num_units, 
-                                          forget_bias=1.,
-                                          state_is_tuple=True,
-                                          activation=tf.nn.tanh,
-                                          initializer=tf.contrib.layers.xavier_initializer()) for _ in range(batch_size)]
-    cells = tf.contrib.rnn.MultiRNNCell(lstm_layer)
-    outputs, _ = tf.nn.dynamic_rnn(cells, 
-                                   x, 
-                                   initial_state=rnn_tuple_state,
+    cell = tf.nn.rnn_cell.LSTMCell(num_units, 
+                                   forget_bias=1.,
+                                   state_is_tuple=True,
+                                   activation=tf.nn.tanh,
+                                   initializer=tf.contrib.layers.xavier_initializer())
+    
+    initial_state = cell.zero_state(1, tf.float32)
+    outputs, _ = tf.nn.dynamic_rnn(cell, 
+                                   x,
+                                   initial_state=initial_state,
                                    dtype="float32")
 
     # dense layer: prediction
@@ -243,8 +233,8 @@ def lstm_exp(filename,
     
     # calculate loss (L2, MSE, huber, hinge or sMAPE, leave uncommented one of them) and optimization algorithm
 #    loss = tf.nn.l2_loss(y-y_hat)
-#    loss = tf.losses.mean_squared_error(y, y_hat)
-    loss = tf.losses.huber_loss(y, y_hat, weights=.2)
+    loss = tf.losses.mean_squared_error(y, y_hat)
+#    loss = tf.losses.huber_loss(y, y_hat, weights=.2)
 #    loss = tf.losses.hinge_loss(y, y_hat)
 #    loss = (200/batch_size)*tf.reduce_mean(tf.abs(y-y_hat))/tf.reduce_mean(y+y_hat)
     opt = tf.train.GradientDescentOptimizer(learning_rate=l_rate).minimize(loss)
