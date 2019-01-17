@@ -233,8 +233,8 @@ def lstm_exp(filename,
     
     # calculate loss (L2, MSE, huber, hinge or sMAPE, leave uncommented one of them) and optimization algorithm
 #    loss = tf.nn.l2_loss(y-y_hat)
-    loss = tf.losses.mean_squared_error(y, y_hat)
-#    loss = tf.losses.huber_loss(y, y_hat, weights=.2)
+#    loss = tf.losses.mean_squared_error(y, y_hat)
+    loss = tf.losses.huber_loss(y, y_hat, delta=.25)
 #    loss = tf.losses.hinge_loss(y, y_hat)
 #    loss = (200/batch_size)*tf.reduce_mean(tf.abs(y-y_hat))/tf.reduce_mean(y+y_hat)
     opt = tf.train.GradientDescentOptimizer(learning_rate=l_rate).minimize(loss)
