@@ -22,38 +22,42 @@ if __name__ == '__main__':
     batch_size = 5
     sequence_len = 20
     stride = 2
-    learning_rate = 1e-3
-    epochs = 5
+    learning_rate = 1e-2
+    epochs = 10
     
     # define convolutional layer(s)
     kernel_size = 3
     number_of_filters = 10  # number of convolutions' filters for each LSTM cells
-    stride_conv = [1, 1, 1, 1]
+    stride_conv = 1
     
     # define lstm elements
     number_of_lstm_units = 50  # number of hidden units in each lstm
     
     
     # define input/output pairs
-    input_ = tf.placeholder(tf.float32, [1, sequence_len, batch_size])  # (batch, input, time)
+    input_ = tf.placeholder(tf.float32, [None, sequence_len, batch_size])  # (batch, input, time)
     target = tf.placeholder(tf.float32, [None, batch_size])  # (batch, output)
     
-    weights_conv = tf.Variable(tf.truncated_normal(shape=[1, 
-                                                          kernel_size,
-                                                          batch_size,
-                                                          number_of_filters]))
-    bias_conv = tf.Variable(tf.zeros(shape=[number_of_filters]))
+    weights_conv = [tf.Variable(tf.truncated_normal(shape=[kernel_size,
+                                                           number_of_filters,
+                                                           1])) for _ in range(batch_size)]
     
-    # tile the input to match the number_of_filters
-    input_ = tf.stack([input_]*number_of_filters, axis=0)
+    bias_conv = tf.Variable(tf.zeros(shape=[batch_size]))
     
-    layer_conv = tf.nn.conv2d(input_,
-                              filter=weights_conv, 
-                              strides=stride_conv, 
-                              padding='VALID')
+    # stack one input for each battery of filters
+    input_stacked = tf.stack([input_]*number_of_filters, axis=3)
+       
+    layer_conv = [tf.nn.conv1d(input_stacked[:,:,i,:],
+                               filters=weights_conv[i], 
+                               stride=stride_conv, 
+                               padding='VALID') for i in range(batch_size)]
+    
+    # squeeze and stack the input of the lstm
+    layer_conv = tf.squeeze(tf.stack([l for l in layer_conv], axis=-2), axis=-1)
     layer_conv = tf.add(layer_conv, bias_conv)
-                              
-    layer_conv = tf.nn.leaky_relu(layer_conv)    
+              
+    # non-linear activation before lstm feeding                
+#    layer_conv = tf.nn.leaky_relu(layer_conv)    
 
     # reshape the output so it can be feeded to the lstm (batch, time, input)
     number_of_lstm_inputs = layer_conv.get_shape().as_list()[1]
@@ -89,8 +93,8 @@ if __name__ == '__main__':
     # loss evaluation
     # calculate loss (L2, MSE, huber, hinge or sMAPE, leave uncommented one of them) and optimization algorithm
 #    loss = tf.nn.l2_loss(target-prediction)
-#    loss = tf.losses.mean_squared_error(target, prediction)
-    loss = tf.losses.huber_loss(target, prediction, weights=.2)
+    loss = tf.losses.mean_squared_error(target, prediction)
+#    loss = tf.losses.huber_loss(target, prediction, delta=.25)
 #    loss = tf.losses.hinge_loss(target, prediction)
 #    loss = (200/batch_size)*tf.reduce_mean(tf.abs(target-prediction))/tf.reduce_mean(target+prediction)
     optimizer = tf.train.AdamOptimizer(learning_rate).minimize(loss)        
@@ -101,7 +105,7 @@ if __name__ == '__main__':
                                                              window=sequence_len,
                                                              stride=stride,
                                                              mode='validation', 
-                                                             non_train_percentage=.3,
+                                                             non_train_percentage=.5,
                                                              val_rel_percentage=.5,
                                                              normalize=True,
                                                              time_difference=True,
@@ -190,7 +194,7 @@ if __name__ == '__main__':
 
         # anomalies' statistics
         errors_test = np.zeros(shape=(len(y_test), batch_size))
-        threshold = [scistats.norm.pdf(mean-3.*std, mean, std) for (mean, std) in zip(means_valid, stds_valid)]
+        threshold = [scistats.norm.pdf(mean-2.*std, mean, std) for (mean, std) in zip(means_valid, stds_valid)]
         anomalies = np.array([np.array([False for _ in range(batch_size)]) for _ in range(len(y_test))])
         
         iter_ = 0
@@ -225,12 +229,12 @@ if __name__ == '__main__':
 
     # plot data series
     ax1.plot(y_test[:int(np.floor(x_test.shape[0] / batch_size))*batch_size], 'b', label='index')
-    ax1.set_xlabel('Date')
-    ax1.set_ylabel('TOPIX')
+    ax1.set_xlabel('Time')
+    ax1.set_ylabel('Index Value')
 
     # plot predictions
     ax1.plot(predictions[:int(np.floor(x_test.shape[0] / batch_size))*batch_size], 'r', label='prediction')
-    ax1.set_ylabel('Change Point')
+    ax1.set_ylabel('Prediction')
     plt.legend(loc='best')
 
     # highlights anomalies
