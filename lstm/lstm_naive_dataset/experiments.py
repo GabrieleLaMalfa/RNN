@@ -17,13 +17,13 @@ if __name__ == '__main__':
     DATA_PATH = 'naive_dataset.csv'
 
     results = LSTM_exp.lstm_exp(filename=DATA_PATH, 
-                                num_units=100, 
-                                window=10,
+                                num_units=50, 
+                                window=5,
                                 stride=3,
-                                batch_size=10,
-                                l_rate=1e-2, 
+                                batch_size=4,
+                                l_rate=1e-3, 
                                 non_train_percentage=0.5, 
-                                training_epochs=5,
+                                training_epochs=10,
                                 l_rate_test=.05, 
                                 val_rel_percentage=.5,
                                 normalize=True,

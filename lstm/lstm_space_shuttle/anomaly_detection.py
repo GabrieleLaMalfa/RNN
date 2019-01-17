@@ -91,8 +91,8 @@ def generate_batches(filename,
         y_train = series_to_matrix(train[window:], 1, stride)
         x_train = series_to_matrix(train, window, stride)       
         
-        y_test = series_to_matrix(test[window:], 1, stride)
-        x_test = series_to_matrix(test, window, stride)
+        y_test = series_to_matrix(test[window:], 1, striding=1)
+        x_test = series_to_matrix(test, window, striding=1)
         
         if stride == 1 or window == 1:
             
@@ -109,15 +109,15 @@ def generate_batches(filename,
         y_train = series_to_matrix(train[window:], 1, stride)
         x_train = series_to_matrix(train, window, stride)
 
-        # split validation+test into validation and test
+        # split validation+test into validation and test: no stride is applied
         validation_size = int(val_rel_percentage * np.ceil(len(data) * non_train_percentage))
         val = data[train_size:validation_size+train_size]; test = data[validation_size+train_size:]
 
-        y_val = series_to_matrix(val[window:], 1, stride)
-        x_val = series_to_matrix(val, window, stride)
+        y_val = series_to_matrix(val[window:], 1, striding=1)
+        x_val = series_to_matrix(val, window, striding=1)
         
-        y_test = series_to_matrix(test[window:], 1, stride)
-        x_test = series_to_matrix(test, window, stride)
+        y_test = series_to_matrix(test[window:], 1, striding=1)
+        x_test = series_to_matrix(test, window, striding=1)
         
         if stride == 1 or window == 1:
             
@@ -202,7 +202,7 @@ def lstm_exp(filename,
         
     print("Datasets shapes: ", X.shape, Y.shape, X_val.shape, Y_val.shape, X_test.shape, Y_test.shape)
 
-    # final dense layerdeclare variable shapes: weights and bias
+    # final dense layer: declare variable shapes: weights and bias
     weights = tf.get_variable('weights', 
                               shape=[num_units, batch_size, batch_size], 
                               initializer=tf.truncated_normal_initializer())
@@ -211,7 +211,7 @@ def lstm_exp(filename,
                            initializer=tf.truncated_normal_initializer())
 
     # placeholders (input)
-    x = tf.placeholder("float", [None, batch_size, window]) # (time, batch, input)
+    x = tf.placeholder("float", [None, batch_size, window]) # (batch, time, input)
     y = tf.placeholder("float", [None, batch_size])  # (batch, output)
 
     # define the LSTM cells

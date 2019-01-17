@@ -91,8 +91,8 @@ def generate_batches(filename,
         y_train = series_to_matrix(train[window:], 1, stride)
         x_train = series_to_matrix(train, window, stride)       
         
-        y_test = series_to_matrix(test[window:], 1, stride)
-        x_test = series_to_matrix(test, window, stride)
+        y_test = series_to_matrix(test[window:], 1, striding=1)
+        x_test = series_to_matrix(test, window, striding=1)
         
         if stride == 1 or window == 1:
             
@@ -109,15 +109,15 @@ def generate_batches(filename,
         y_train = series_to_matrix(train[window:], 1, stride)
         x_train = series_to_matrix(train, window, stride)
 
-        # split validation+test into validation and test
+        # split validation+test into validation and test: no stride is applied
         validation_size = int(val_rel_percentage * np.ceil(len(data) * non_train_percentage))
         val = data[train_size:validation_size+train_size]; test = data[validation_size+train_size:]
 
-        y_val = series_to_matrix(val[window:], 1, stride)
-        x_val = series_to_matrix(val, window, stride)
+        y_val = series_to_matrix(val[window:], 1, striding=1)
+        x_val = series_to_matrix(val, window, striding=1)
         
-        y_test = series_to_matrix(test[window:], 1, stride)
-        x_test = series_to_matrix(test, window, stride)
+        y_test = series_to_matrix(test[window:], 1, striding=1)
+        x_test = series_to_matrix(test, window, striding=1)
         
         if stride == 1 or window == 1:
             
