@@ -19,19 +19,19 @@ if __name__ == '__main__':
     # reset computational graph
     tf.reset_default_graph()
         
-    batch_size = 5
-    sequence_len = 20
-    stride = 2
-    learning_rate = 1e-2
+    batch_size = 3
+    sequence_len = 8
+    stride = 5
+    learning_rate = 1e-3
     epochs = 10
     
     # define convolutional layer(s)
     kernel_size = 3
-    number_of_filters = 10  # number of convolutions' filters for each LSTM cells
+    number_of_filters = 20  # number of convolutions' filters for each LSTM cells
     stride_conv = 1
     
     # define lstm elements
-    number_of_lstm_units = 50  # number of hidden units in each lstm
+    number_of_lstm_units = 128  # number of hidden units in each lstm
     
     
     # define input/output pairs
@@ -50,14 +50,14 @@ if __name__ == '__main__':
     layer_conv = [tf.nn.conv1d(input_stacked[:,:,i,:],
                                filters=weights_conv[i], 
                                stride=stride_conv, 
-                               padding='VALID') for i in range(batch_size)]
+                               padding='SAME') for i in range(batch_size)]
     
     # squeeze and stack the input of the lstm
     layer_conv = tf.squeeze(tf.stack([l for l in layer_conv], axis=-2), axis=-1)
     layer_conv = tf.add(layer_conv, bias_conv)
               
     # non-linear activation before lstm feeding                
-#    layer_conv = tf.nn.leaky_relu(layer_conv)    
+    layer_conv = tf.nn.leaky_relu(layer_conv)    
 
     # reshape the output so it can be feeded to the lstm (batch, time, input)
     number_of_lstm_inputs = layer_conv.get_shape().as_list()[1]
@@ -90,13 +90,19 @@ if __name__ == '__main__':
     # dense layer: prediction
     prediction = tf.tensordot(tf.reshape(outputs, shape=(batch_size, number_of_lstm_units)), weights_dense, 2) + bias_dense
     
+    # exponential decay of the predictions
+    decay = tf.constant(np.array([2**(i) for i in range(batch_size)], dtype='float32')[::-1])
+#    prediction = prediction*decay
+
     # loss evaluation
-    # calculate loss (L2, MSE, huber, hinge or sMAPE, leave uncommented one of them) and optimization algorithm
-#    loss = tf.nn.l2_loss(target-prediction)
-    loss = tf.losses.mean_squared_error(target, prediction)
+    # calculate loss (L2, MSE, huber, hinge, sMAPE: leave uncommented one of them)
+    loss = tf.nn.l2_loss(target-prediction)
+#    loss = tf.losses.mean_squared_error(target, prediction)
 #    loss = tf.losses.huber_loss(target, prediction, delta=.25)
 #    loss = tf.losses.hinge_loss(target, prediction)
 #    loss = (200/batch_size)*tf.reduce_mean(tf.abs(target-prediction))/tf.reduce_mean(target+prediction)
+    
+    # optimization algorithm
     optimizer = tf.train.AdamOptimizer(learning_rate).minimize(loss)        
     
     # extract train and test
@@ -159,7 +165,7 @@ if __name__ == '__main__':
                 batch_y = y_train[np.newaxis, iter_*batch_size: (iter_+1)*batch_size]
                 
                 sess.run(optimizer, feed_dict={input_: batch_x,
-                                               target: batch_y})
+                                               target: batch_y})   
     
                 iter_ +=  1
 
@@ -180,8 +186,8 @@ if __name__ == '__main__':
         # estimate mean and deviation of the errors' vector
         #  since we have a batch size that may be different from 1 and we consider
         #   the error of each last batch_y, we need to cut off the zero values
-        n_mixtures = 2
-        errors_valid = errors_valid[:iter_]
+        n_mixtures = 1
+        errors_valid = errors_valid[:iter_].flatten()
         gaussian_mixture = mixture.GaussianMixture(n_components=n_mixtures)
         gm = gaussian_mixture.fit(errors_valid.reshape(-1, 1))
         means_valid = gm.means_[:,0]
@@ -189,11 +195,11 @@ if __name__ == '__main__':
         weights_valid = gm.weights_
                 
         # test
-        predictions = np.zeros(shape=(len(y_test), batch_size))
+        predictions = np.zeros(shape=(int(np.floor(x_test.shape[0] / batch_size)), batch_size))
         y_test = y_test[:x_test.shape[0]]
 
         # anomalies' statistics
-        errors_test = np.zeros(shape=(len(y_test), batch_size))
+        errors_test = np.zeros(shape=(len(predictions), batch_size))
         threshold = [scistats.norm.pdf(mean-2.*std, mean, std) for (mean, std) in zip(means_valid, stds_valid)]
         anomalies = np.array([np.array([False for _ in range(batch_size)]) for _ in range(len(y_test))])
         
@@ -204,25 +210,24 @@ if __name__ == '__main__':
             batch_x = x_test[iter_*batch_size: (iter_+1)*batch_size, :].T.reshape(1, sequence_len, batch_size)
             batch_y = y_test[np.newaxis, iter_*batch_size: (iter_+1)*batch_size]
                 
-            predictions[iter_*batch_size:(iter_+1)*batch_size] = sess.run(prediction, feed_dict={input_: batch_x,
-                                                                                                 target: batch_y}).flatten()
-            
+            predictions[iter_] = sess.run(prediction, feed_dict={input_: batch_x,
+                                                                 target: batch_y}).flatten()
+         
             for i in range(batch_size):
                 
                 # evaluate Pr(Z=1|X) for each gaussian distribution
-                num = np.array([w*scistats.norm.pdf(predictions[(iter_*batch_size), i]-batch_y[:,i], mean, std) for (mean, std, w) in zip(means_valid, stds_valid, weights_valid)])
-                den = np.sum(num)
-                
-                index = np.argmax(num/den)
-                errors_test[(iter_*batch_size), i] = scistats.norm.pdf(predictions[(iter_*batch_size), i]-batch_y[:,i], means_valid[index], stds_valid[index])
-                anomalies[(iter_*batch_size), i] = (True if (errors_test[(iter_*batch_size), i] < threshold[index]) else False)
+                num = np.array([w*scistats.norm.pdf(predictions[iter_, i]-batch_y[:,i], mean, std) for (mean, std, w) in zip(means_valid, stds_valid, weights_valid)])
+                den = np.sum(num)                
+                index = np.argmax(num/den)                
+                errors_test[iter_, i] = scistats.norm.pdf(predictions[iter_, i]-batch_y[:,i], means_valid[index], stds_valid[index])
+                anomalies[iter_, i] = (True if (errors_test[iter_, i] < threshold[index]) else False)
             
             iter_ +=  1
         
-        anomalies = np.argwhere(anomalies.flatten() == True)
-            
-         
-    predictions = predictions[:,-1]
+        anomalies = np.argwhere(anomalies.flatten() == True)            
+    
+    errors_test = errors_test.flatten() 
+    predictions = predictions.flatten()
     
     # plot results
     fig, ax1 = plt.subplots()
@@ -245,4 +250,39 @@ if __name__ == '__main__':
             plt.axvspan(i, i+1, color='yellow', alpha=0.5, lw=0)
         
     fig.tight_layout()
-    plt.show()               
+    plt.show()
+    
+    print("Total test error:", np.sum(np.abs(errors_test)))
+    
+    # plot reconstructed signal
+    tot_y = 0.
+    tot_y_hat = 0.
+    recovered_plot_y = np.zeros(shape=len(predictions[:int(np.floor(x_test.shape[0] / batch_size))*batch_size])+1)
+    recovered_plot_y_hat = np.zeros(shape=len(predictions[:int(np.floor(x_test.shape[0] / batch_size))*batch_size])+1)
+    for i in range(1, len(recovered_plot_y)):
+        
+        recovered_plot_y[i] = tot_y
+        recovered_plot_y_hat[i] = tot_y_hat
+        
+        tot_y += y_test[i-1]
+        tot_y_hat += predictions[i-1] 
+                
+    fig, ax1 = plt.subplots()
+
+    # plot data series
+    print("\nReconstruction:")
+    ax1.plot(recovered_plot_y, 'b', label='index')
+    ax1.set_xlabel('RECONSTRUCTION: Date')
+    ax1.set_ylabel('Space Shuttle')
+
+    # plot predictions
+    ax1.plot(recovered_plot_y_hat, 'r', label='prediction')
+    ax1.set_ylabel('RECONSTRUCTION: Prediction')
+    plt.legend(loc='best')
+
+    fig.tight_layout()
+    plt.show()
+    
+    # errors on test
+    print("\nTest errors:")
+    plt.plot(np.array(errors_test).ravel())                

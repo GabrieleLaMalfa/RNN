@@ -2,7 +2,7 @@
 """
 Created on Sat Nov 24 15:27:05 2018
 
-@author: Gabriele
+@author: Emanuele
 """
 
 import numpy as np
@@ -18,7 +18,7 @@ if __name__ == '__main__':
 
     results = LSTM_exp.lstm_exp(filename=DATA_PATH, 
                                 num_units=75, 
-                                window=25,
+                                window=15,
                                 stride=3,
                                 batch_size=5,
                                 l_rate=1e-3, 

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Jan  3 14:20:30 2019
+Created on Wed Jan  2 13:56:22 2019
 
 @author: Emanuele
 """
@@ -11,7 +11,7 @@ import scipy.stats as scistats
 from sklearn import mixture as mixture
 import tensorflow as tf
 
-import utils_topix as utils
+import utils_dataset as utils
 
 
 if __name__ == '__main__':
@@ -19,64 +19,133 @@ if __name__ == '__main__':
     # reset computational graph
     tf.reset_default_graph()
         
-    batch_size = 5
-    sequence_len = 15
-    learning_rate = 5e-4
-    
-    # define input/output pairs
-    input_ = tf.placeholder(tf.float32, [batch_size, sequence_len])
-    target = tf.placeholder(tf.float32, [batch_size, 1])
-    
-    # expand input to be supported by conv1d operation
-    input_ = tf.expand_dims(input_, -1)
+    batch_size = 3
+    sequence_len = 8
+    stride = 5
+    learning_rate = 1e-3
+    epochs = 10
     
     # define convolutional layer(s)
     kernel_size = 3
-    number_of_channels = 1
-    number_of_filters = 50
+    number_of_filters = 20  # number of convolutions' filters for each LSTM cells
+    stride_conv = 1
     
-    weights_conv = tf.Variable(tf.truncated_normal(shape=[kernel_size, 
-                                                          number_of_channels,
-                                                          number_of_filters]))
-    bias_conv = tf.Variable(tf.zeros(shape=[number_of_filters]))
+    # define lstm elements
+    number_of_lstm_units = 35  # number of hidden units in each lstm
     
-    layer_conv = tf.nn.conv1d(input_, filters=weights_conv, stride=1, padding='SAME')    
-    layer_conv = tf.nn.relu(layer_conv)
     
-    # flatten the output
-    dims = layer_conv.get_shape()
-    number_of_elements = dims[2:].num_elements()
-    layer_conv_flatten = tf.reshape(layer_conv, [batch_size, sequence_len, number_of_elements])
+    # define input/output pairs
+    input_ = tf.placeholder(tf.float32, [None, sequence_len, batch_size])  # (batch, input, time)
+    target = tf.placeholder(tf.float32, [None, batch_size])  # (batch, output)
     
-    # define lstm layer(s)
-    number_of_lstm_layers = 3
+    weights_conv = [tf.Variable(tf.truncated_normal(shape=[kernel_size,
+                                                           number_of_filters,
+                                                           1])) for _ in range(batch_size)]
     
-    cell_lstm = tf.contrib.rnn.BasicLSTMCell(number_of_filters)
-    layer_lstm = tf.contrib.rnn.MultiRNNCell([cell_lstm for _ in range(number_of_lstm_layers)])
-    outputs, states = tf.nn.dynamic_rnn(layer_lstm, layer_conv_flatten, dtype=tf.float32)
+    bias_conv = tf.Variable(tf.zeros(shape=[batch_size]))
     
+    # stack one input for each battery of filters
+    input_stacked = tf.stack([input_]*number_of_filters, axis=3)
+       
+    layer_conv = [tf.nn.conv1d(input_stacked[:,:,i,:],
+                               filters=weights_conv[i], 
+                               stride=stride_conv, 
+                               padding='SAME') for i in range(batch_size)]
+    
+    # squeeze and stack the input of the lstm
+    layer_conv = tf.squeeze(tf.stack([l for l in layer_conv], axis=-2), axis=-1)
+    layer_conv = tf.add(layer_conv, bias_conv)
+              
+    # non-linear activation before lstm feeding                
+    layer_conv = tf.nn.leaky_relu(layer_conv)    
+
+    # reshape the output so it can be feeded to the lstm (batch, time, input)
+    number_of_lstm_inputs = layer_conv.get_shape().as_list()[1]
+    layer_conv_flatten = tf.reshape(layer_conv, (-1, batch_size, number_of_lstm_inputs))
+        
+    # define the LSTM cells
+    cell = tf.nn.rnn_cell.LSTMCell(number_of_lstm_units, 
+                                   forget_bias=1.,
+                                   state_is_tuple=True,
+                                   activation=tf.nn.tanh,
+                                   initializer=tf.contrib.layers.xavier_initializer())
+    
+    initial_state = cell.zero_state(1, tf.float32)
+    outputs, _ = tf.nn.dynamic_rnn(cell, 
+                                   layer_conv_flatten,
+                                   initial_state=initial_state,
+                                   dtype="float32")
+        
     # dense layer extraction
+    # final dense layer: declare variable shapes: weights and bias
+    weights_dense = tf.get_variable('weights', 
+                              shape=[number_of_lstm_units, batch_size, batch_size], 
+                              initializer=tf.truncated_normal_initializer())
+    bias_dense = tf.get_variable('bias', 
+                           shape=[1, batch_size], 
+                           initializer=tf.truncated_normal_initializer())
+    
     output_lstm = outputs[:, -1, :]
-    weights_dense = tf.Variable(tf.truncated_normal(shape=[number_of_filters, 1]))
-    bias_dense = tf.Variable(tf.zeros(shape=[1]))
     
-    layer_dense = tf.matmul(output_lstm, weights_dense) + bias_dense
-    prediction = layer_dense  # linear activation
+    # dense layer: prediction
+    prediction = tf.tensordot(tf.reshape(outputs, shape=(batch_size, number_of_lstm_units)), weights_dense, 2) + bias_dense
     
+    # exponential decay of the predictions
+    decay = tf.constant(np.array([2**(-i) for i in range(batch_size)], dtype='float32')[::-1])
+#    prediction = prediction*decay
+
     # loss evaluation
-    loss = tf.losses.mean_squared_error(labels=target[-1], predictions=prediction[-1])
+    # calculate loss (L2, MSE, huber, hinge, sMAPE: leave uncommented one of them)
+    loss = tf.nn.l2_loss(target-prediction)
+#    loss = tf.losses.mean_squared_error(target, prediction)
+#    loss = tf.losses.huber_loss(target, prediction, delta=.25)
+#    loss = tf.losses.hinge_loss(target, prediction)
+#    loss = (200/batch_size)*tf.reduce_mean(tf.abs(target-prediction))/tf.reduce_mean(target+prediction)
+    
+    # optimization algorithm
     optimizer = tf.train.AdamOptimizer(learning_rate).minimize(loss)        
     
     # extract train and test
     x_train, y_train, x_valid, y_valid, x_test, y_test = utils.generate_batches(
                                                              filename='data/power_consumption.csv', 
-                                                             window=sequence_len, mode='validation', 
+                                                             window=sequence_len,
+                                                             stride=stride,
+                                                             mode='validation', 
                                                              non_train_percentage=.5,
                                                              val_rel_percentage=.5,
-                                                             normalize=True)
+                                                             normalize=True,
+                                                             time_difference=False,
+                                                             td_method=None)
+    
+    # suppress second axis on Y values (the algorithms expects shapes like (n,) for the prediction)
+    y_train = y_train[:,0]; y_valid = y_valid[:,0]; y_test = y_test[:,0]
+    
+    # if the dimensions mismatch (somehow, due tu bugs in generate_batches function,
+    #  make them match)
+    mismatch = False
+    
+    if len(x_train) > len(y_train):
+        
+        x_train = x_train[:len(y_train)]
+        mismatch = True
+    
+    if len(x_valid) > len(y_valid):
+        
+        x_valid = x_valid[:len(y_valid)]
+        mismatch = True
+    
+    if len(x_test) > len(y_test):
+        
+        x_test = x_test[:len(y_test)]
+        mismatch = True
+    
+    if mismatch is True: 
+        
+        print("Mismatched dimensions due to generate batches: this will be corrected automatically.")
+        
+    print("Datasets shapes: ", x_train.shape, y_train.shape, x_valid.shape, y_valid.shape, x_test.shape, y_test.shape)
     
     # train the model
-    epochs = 25
     init = tf.global_variables_initializer()
 
     with tf.Session() as sess:
@@ -92,33 +161,33 @@ if __name__ == '__main__':
             
             while iter_ < int(np.floor(x_train.shape[0] / batch_size)):
         
-                batch_x = x_train[iter_*batch_size: (iter_+1)*batch_size, :, np.newaxis]
-                batch_y = y_train[iter_*batch_size: (iter_+1)*batch_size, np.newaxis]
+                batch_x = x_train[iter_*batch_size: (iter_+1)*batch_size, :].T.reshape(1, sequence_len, batch_size)
+                batch_y = y_train[np.newaxis, iter_*batch_size: (iter_+1)*batch_size]
                 
                 sess.run(optimizer, feed_dict={input_: batch_x,
-                                               target: batch_y})
+                                               target: batch_y})   
     
                 iter_ +=  1
 
         # validation
-        errors_valid = np.zeros(shape=len(x_valid))
+        errors_valid = np.zeros(shape=(len(x_valid), batch_size))
         iter_ = 0
         
         while iter_ < int(np.floor(x_valid.shape[0] / batch_size)):
     
-            batch_x = x_valid[iter_*batch_size: (iter_+1)*batch_size, :, np.newaxis]
-            batch_y = y_valid[iter_*batch_size: (iter_+1)*batch_size, np.newaxis]
+            batch_x = x_valid[iter_*batch_size: (iter_+1)*batch_size, :].T.reshape(1, sequence_len, batch_size)
+            batch_y = y_valid[np.newaxis, iter_*batch_size: (iter_+1)*batch_size]
                 
             errors_valid[iter_] = sess.run(prediction-batch_y, feed_dict={input_: batch_x,
-                                                                          target: batch_y})[-1]
+                                                                          target: batch_y})
 
             iter_ +=  1
         
         # estimate mean and deviation of the errors' vector
         #  since we have a batch size that may be different from 1 and we consider
         #   the error of each last batch_y, we need to cut off the zero values
-        n_mixtures = 3
-        errors_valid = errors_valid[:iter_]
+        n_mixtures = 1
+        errors_valid = errors_valid[:iter_].flatten()
         gaussian_mixture = mixture.GaussianMixture(n_components=n_mixtures)
         gm = gaussian_mixture.fit(errors_valid.reshape(-1, 1))
         means_valid = gm.means_[:,0]
@@ -126,50 +195,51 @@ if __name__ == '__main__':
         weights_valid = gm.weights_
                 
         # test
-        predictions = np.zeros(shape=y_test.shape)
+        predictions = np.zeros(shape=(int(np.floor(x_test.shape[0] / batch_size)), batch_size))
         y_test = y_test[:x_test.shape[0]]
 
         # anomalies' statistics
-        errors_test = np.zeros(shape=len(y_test))
+        errors_test = np.zeros(shape=(len(predictions), batch_size))
         threshold = [scistats.norm.pdf(mean-2.*std, mean, std) for (mean, std) in zip(means_valid, stds_valid)]
-        anomalies = np.array([False for _ in range(len(y_test))])
+        anomalies = np.array([np.array([False for _ in range(batch_size)]) for _ in range(len(y_test))])
         
         iter_ = 0
         
         while iter_ < int(np.floor(x_test.shape[0] / batch_size)):
     
-            batch_x = x_test[iter_*batch_size: (iter_+1)*batch_size, :, np.newaxis]
-            batch_y = y_test[iter_*batch_size: (iter_+1)*batch_size, np.newaxis]
+            batch_x = x_test[iter_*batch_size: (iter_+1)*batch_size, :].T.reshape(1, sequence_len, batch_size)
+            batch_y = y_test[np.newaxis, iter_*batch_size: (iter_+1)*batch_size]
                 
-            predictions[iter_*batch_size:(iter_+1)*batch_size] = sess.run(prediction, feed_dict={input_: batch_x,
-                                                                                                 target: batch_y}).flatten()
-            
+            predictions[iter_] = sess.run(prediction, feed_dict={input_: batch_x,
+                                                                 target: batch_y}).flatten()
+         
             for i in range(batch_size):
                 
                 # evaluate Pr(Z=1|X) for each gaussian distribution
-                num = np.array([w*scistats.norm.pdf(predictions[(iter_*batch_size)+i]-batch_y[i], mean, std) for (mean, std, w) in zip(means_valid, stds_valid, weights_valid)])
-                den = np.sum(num)
-                
-                index = np.argmax(num/den)
-                errors_test[(iter_*batch_size)+i] = scistats.norm.pdf(predictions[(iter_*batch_size)+i]-batch_y[i], means_valid[index], stds_valid[index])
-                anomalies[(iter_*batch_size)+i] = (True if (errors_test[(iter_*batch_size)+i] < threshold[index]) else False)
+                num = np.array([w*scistats.norm.pdf(predictions[iter_, i]-batch_y[:,i], mean, std) for (mean, std, w) in zip(means_valid, stds_valid, weights_valid)])
+                den = np.sum(num)                
+                index = np.argmax(num/den)                
+                errors_test[iter_, i] = scistats.norm.pdf(predictions[iter_, i]-batch_y[:,i], means_valid[index], stds_valid[index])
+                anomalies[iter_, i] = (True if (errors_test[iter_, i] < threshold[index]) else False)
             
             iter_ +=  1
         
-        anomalies = np.argwhere(anomalies == True)
-            
-            
+        anomalies = np.argwhere(anomalies.flatten() == True)            
+    
+    errors_test = errors_test.flatten() 
+    predictions = predictions.flatten()
+    
     # plot results
     fig, ax1 = plt.subplots()
 
     # plot data series
     ax1.plot(y_test[:int(np.floor(x_test.shape[0] / batch_size))*batch_size], 'b', label='index')
-    ax1.set_xlabel('Date')
-    ax1.set_ylabel('TOPIX')
+    ax1.set_xlabel('Time')
+    ax1.set_ylabel('Index Value')
 
     # plot predictions
     ax1.plot(predictions[:int(np.floor(x_test.shape[0] / batch_size))*batch_size], 'r', label='prediction')
-    ax1.set_ylabel('Change Point')
+    ax1.set_ylabel('Prediction')
     plt.legend(loc='best')
 
     # highlights anomalies
@@ -180,4 +250,39 @@ if __name__ == '__main__':
             plt.axvspan(i, i+1, color='yellow', alpha=0.5, lw=0)
         
     fig.tight_layout()
-    plt.show()               
+    plt.show()
+    
+    print("Total test error:", np.sum(np.abs(errors_test)))
+    
+    # plot reconstructed signal
+    tot_y = 0.
+    tot_y_hat = 0.
+    recovered_plot_y = np.zeros(shape=len(predictions[:int(np.floor(x_test.shape[0] / batch_size))*batch_size])+1)
+    recovered_plot_y_hat = np.zeros(shape=len(predictions[:int(np.floor(x_test.shape[0] / batch_size))*batch_size])+1)
+    for i in range(1, len(recovered_plot_y)):
+        
+        recovered_plot_y[i] = tot_y
+        recovered_plot_y_hat[i] = tot_y_hat
+        
+        tot_y += y_test[i-1]
+        tot_y_hat += predictions[i-1] 
+                
+    fig, ax1 = plt.subplots()
+
+    # plot data series
+    print("\nReconstruction:")
+    ax1.plot(recovered_plot_y, 'b', label='index')
+    ax1.set_xlabel('RECONSTRUCTION: Date')
+    ax1.set_ylabel('Space Shuttle')
+
+    # plot predictions
+    ax1.plot(recovered_plot_y_hat, 'r', label='prediction')
+    ax1.set_ylabel('RECONSTRUCTION: Prediction')
+    plt.legend(loc='best')
+
+    fig.tight_layout()
+    plt.show()
+    
+    # errors on test
+    print("\nTest errors:")
+    plt.hist(np.array(errors_test).ravel(), bins=30)                
