@@ -92,15 +92,15 @@ if __name__ == '__main__':
     
     # exponential decay of the predictions
     decay = tf.constant(np.array([2**(-i) for i in range(batch_size)], dtype='float32')[::-1])
-#    prediction = prediction*decay
+    prediction_with_decay = prediction*decay
 
     # loss evaluation
     # calculate loss (L2, MSE, huber, hinge, sMAPE: leave uncommented one of them)
-    loss = tf.nn.l2_loss(target-prediction)
-#    loss = tf.losses.mean_squared_error(target, prediction)
-#    loss = tf.losses.huber_loss(target, prediction, delta=.25)
-#    loss = tf.losses.hinge_loss(target, prediction)
-#    loss = (200/batch_size)*tf.reduce_mean(tf.abs(target-prediction))/tf.reduce_mean(target+prediction)
+    loss = tf.nn.l2_loss(target-prediction_with_decay)
+#    loss = tf.losses.mean_squared_error(target, prediction_with_decay)
+#    loss = tf.losses.huber_loss(target, prediction_with_decay, delta=.25)
+#    loss = tf.losses.hinge_loss(target, prediction_with_decay)
+#    loss = (200/batch_size)*tf.reduce_mean(tf.abs(target-prediction_with_decay))/tf.reduce_mean(target+prediction_with_decay)
     
     # optimization algorithm
     optimizer = tf.train.AdamOptimizer(learning_rate).minimize(loss)        
@@ -199,6 +199,7 @@ if __name__ == '__main__':
         y_test = y_test[:x_test.shape[0]]
 
         # anomalies' statistics
+        gaussian_error_statistics = np.zeros(shape=(len(predictions), batch_size))
         errors_test = np.zeros(shape=(len(predictions), batch_size))
         threshold = [scistats.norm.pdf(mean-2.*std, mean, std) for (mean, std) in zip(means_valid, stds_valid)]
         anomalies = np.array([np.array([False for _ in range(batch_size)]) for _ in range(len(y_test))])
@@ -212,6 +213,8 @@ if __name__ == '__main__':
                 
             predictions[iter_] = sess.run(prediction, feed_dict={input_: batch_x,
                                                                  target: batch_y}).flatten()
+    
+            errors_test[iter_] = batch_y - predictions[iter_]
          
             for i in range(batch_size):
                 
@@ -219,14 +222,14 @@ if __name__ == '__main__':
                 num = np.array([w*scistats.norm.pdf(predictions[iter_, i]-batch_y[:,i], mean, std) for (mean, std, w) in zip(means_valid, stds_valid, weights_valid)])
                 den = np.sum(num)                
                 index = np.argmax(num/den)                
-                errors_test[iter_, i] = scistats.norm.pdf(predictions[iter_, i]-batch_y[:,i], means_valid[index], stds_valid[index])
-                anomalies[iter_, i] = (True if (errors_test[iter_, i] < threshold[index]) else False)
+                gaussian_error_statistics[iter_, i] = scistats.norm.pdf(predictions[iter_, i]-batch_y[:,i], means_valid[index], stds_valid[index])
+                anomalies[iter_, i] = (True if (gaussian_error_statistics[iter_, i] < threshold[index]) else False)
             
             iter_ +=  1
         
         anomalies = np.argwhere(anomalies.flatten() == True)            
     
-    errors_test = errors_test.flatten() 
+    errors_test = errors_test.flatten()
     predictions = predictions.flatten()
     
     # plot results
@@ -285,4 +288,4 @@ if __name__ == '__main__':
     
     # errors on test
     print("\nTest errors:")
-    plt.plot(np.array(errors_test).ravel())                
+    plt.hist(np.array(errors_test).ravel(), bins=30)                

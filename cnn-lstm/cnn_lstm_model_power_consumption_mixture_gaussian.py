@@ -19,10 +19,10 @@ if __name__ == '__main__':
     # reset computational graph
     tf.reset_default_graph()
         
-    batch_size = 3
-    sequence_len = 8
-    stride = 5
-    learning_rate = 1e-3
+    batch_size = 10
+    sequence_len = 5
+    stride = 2
+    learning_rate = 5e-4
     epochs = 10
     
     # define convolutional layer(s)
@@ -89,18 +89,19 @@ if __name__ == '__main__':
     
     # dense layer: prediction
     prediction = tf.tensordot(tf.reshape(outputs, shape=(batch_size, number_of_lstm_units)), weights_dense, 2) + bias_dense
+    prediction = tf.nn.tanh(prediction)
     
     # exponential decay of the predictions
     decay = tf.constant(np.array([2**(-i) for i in range(batch_size)], dtype='float32')[::-1])
-#    prediction = prediction*decay
+    prediction_with_decay = prediction*decay
 
     # loss evaluation
     # calculate loss (L2, MSE, huber, hinge, sMAPE: leave uncommented one of them)
-    loss = tf.nn.l2_loss(target-prediction)
-#    loss = tf.losses.mean_squared_error(target, prediction)
-#    loss = tf.losses.huber_loss(target, prediction, delta=.25)
-#    loss = tf.losses.hinge_loss(target, prediction)
-#    loss = (200/batch_size)*tf.reduce_mean(tf.abs(target-prediction))/tf.reduce_mean(target+prediction)
+    loss = tf.nn.l2_loss(target-prediction_with_decay)
+#    loss = tf.losses.mean_squared_error(target, prediction_with_decay)
+#    loss = tf.losses.huber_loss(target, prediction_with_decay, delta=.25)
+#    loss = tf.losses.hinge_loss(target, prediction_with_decay)
+#    loss = (200/batch_size)*tf.reduce_mean(tf.abs(target-prediction_with_decay))/tf.reduce_mean(target+prediction_with_decay)
     
     # optimization algorithm
     optimizer = tf.train.AdamOptimizer(learning_rate).minimize(loss)        
@@ -111,10 +112,10 @@ if __name__ == '__main__':
                                                              window=sequence_len,
                                                              stride=stride,
                                                              mode='validation', 
-                                                             non_train_percentage=.5,
+                                                             non_train_percentage=.3,
                                                              val_rel_percentage=.5,
                                                              normalize=True,
-                                                             time_difference=False,
+                                                             time_difference=True,
                                                              td_method=None)
     
     # suppress second axis on Y values (the algorithms expects shapes like (n,) for the prediction)
@@ -199,8 +200,9 @@ if __name__ == '__main__':
         y_test = y_test[:x_test.shape[0]]
 
         # anomalies' statistics
+        gaussian_error_statistics = np.zeros(shape=(len(predictions), batch_size))
         errors_test = np.zeros(shape=(len(predictions), batch_size))
-        threshold = [scistats.norm.pdf(mean-2.*std, mean, std) for (mean, std) in zip(means_valid, stds_valid)]
+        threshold = [scistats.norm.pdf(mean-3.*std, mean, std) for (mean, std) in zip(means_valid, stds_valid)]
         anomalies = np.array([np.array([False for _ in range(batch_size)]) for _ in range(len(y_test))])
         
         iter_ = 0
@@ -212,6 +214,8 @@ if __name__ == '__main__':
                 
             predictions[iter_] = sess.run(prediction, feed_dict={input_: batch_x,
                                                                  target: batch_y}).flatten()
+    
+            errors_test[iter_] = batch_y - predictions[iter_]
          
             for i in range(batch_size):
                 
@@ -219,14 +223,14 @@ if __name__ == '__main__':
                 num = np.array([w*scistats.norm.pdf(predictions[iter_, i]-batch_y[:,i], mean, std) for (mean, std, w) in zip(means_valid, stds_valid, weights_valid)])
                 den = np.sum(num)                
                 index = np.argmax(num/den)                
-                errors_test[iter_, i] = scistats.norm.pdf(predictions[iter_, i]-batch_y[:,i], means_valid[index], stds_valid[index])
-                anomalies[iter_, i] = (True if (errors_test[iter_, i] < threshold[index]) else False)
+                gaussian_error_statistics[iter_, i] = scistats.norm.pdf(predictions[iter_, i]-batch_y[:,i], means_valid[index], stds_valid[index])
+                anomalies[iter_, i] = (True if (gaussian_error_statistics[iter_, i] < threshold[index]) else False)
             
             iter_ +=  1
         
         anomalies = np.argwhere(anomalies.flatten() == True)            
     
-    errors_test = errors_test.flatten() 
+    errors_test = errors_test.flatten()
     predictions = predictions.flatten()
     
     # plot results
@@ -285,4 +289,4 @@ if __name__ == '__main__':
     
     # errors on test
     print("\nTest errors:")
-    plt.hist(np.array(errors_test).ravel(), bins=30)                
+    plt.hist(np.array(errors_test).ravel(), bins=30)                               

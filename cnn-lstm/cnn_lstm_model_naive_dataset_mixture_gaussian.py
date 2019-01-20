@@ -19,19 +19,19 @@ if __name__ == '__main__':
     # reset computational graph
     tf.reset_default_graph()
         
-    batch_size = 3
+    batch_size = 5
     sequence_len = 10
-    stride = 3
+    stride = 1
     learning_rate = 1e-2
-    epochs = 10
+    epochs = 5
     
     # define convolutional layer(s)
-    kernel_size = 3
-    number_of_filters = 35  # number of convolutions' filters for each LSTM cells
+    kernel_size = 2
+    number_of_filters = 10  # number of convolutions' filters for each LSTM cells
     stride_conv = 1
     
     # define lstm elements
-    number_of_lstm_units = 50  # number of hidden units in each lstm
+    number_of_lstm_units = 35  # number of hidden units in each lstm
     
     
     # define input/output pairs
@@ -90,9 +90,10 @@ if __name__ == '__main__':
     # dense layer: prediction
     prediction = tf.tensordot(tf.reshape(outputs, shape=(batch_size, number_of_lstm_units)), weights_dense, 2) + bias_dense
     
-    # exponential decay of the predictions
-    decay = tf.constant(np.array([2**(-i) for i in range(batch_size)], dtype='float32')[::-1])
-    prediction_with_decay = prediction*decay
+#    # (optional) exponential decay of the predictions
+#    decay = tf.constant(np.array([2**(-i) for i in range(batch_size)], dtype='float32')[::-1])
+#    prediction_with_decay = prediction*decay
+    prediction_with_decay = prediction
 
     # loss evaluation
     # calculate loss (L2, MSE, huber, hinge, sMAPE: leave uncommented one of them)
@@ -107,7 +108,7 @@ if __name__ == '__main__':
     
     # extract train and test
     x_train, y_train, x_valid, y_valid, x_test, y_test = utils.generate_batches(
-                                                             filename='data/space_shuttle_marotta_valve.csv', 
+                                                             filename='data/naive_dataset.csv', 
                                                              window=sequence_len,
                                                              stride=stride,
                                                              mode='validation', 
