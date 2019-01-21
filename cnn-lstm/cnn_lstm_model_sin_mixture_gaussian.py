@@ -19,9 +19,9 @@ if __name__ == '__main__':
     # reset computational graph
     tf.reset_default_graph()
         
-    batch_size = 3
+    batch_size = 1
     sequence_len = 8
-    stride = 5
+    stride = 1
     learning_rate = 1e-3
     epochs = 10
     
@@ -112,7 +112,7 @@ if __name__ == '__main__':
                                                              stride=stride,
                                                              mode='validation', 
                                                              non_train_percentage=.5,
-                                                             val_rel_percentage=.8,
+                                                             val_rel_percentage=.5,
                                                              normalize=True,
                                                              time_difference=True,
                                                              td_method=None)
@@ -285,7 +285,40 @@ if __name__ == '__main__':
 
     fig.tight_layout()
     plt.show()
-    
+
     # errors on test
     print("\nTest errors:")
-    plt.hist(np.array(errors_test).ravel(), bins=30)                
+    plt.hist(np.array(errors_test).ravel(), bins=30) 
+
+    # performances
+    target_anomalies = np.zeros(shape=int(np.floor(x_test.shape[0] / batch_size))*batch_size)
+    
+    # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
+    # train 50%, validation_relative 50%
+    target_anomalies[860:909] = target_anomalies[1111:1140] = 1
+    target_anomalies[1561:1599] = target_anomalies[1906:1945] = 1
+    
+    # real values
+    condition_positive = np.argwhere(target_anomalies == 1)
+    condition_negative = np.argwhere(target_anomalies == 0)
+    
+    # predictions
+    predicted_positive = anomalies
+    predicted_negative = np.setdiff1d(np.array([i for i in range(len(target_anomalies))]), 
+                                      predicted_positive,
+                                      assume_unique=True)
+    
+    # precision
+    precision = len(np.intersect1d(condition_positive, predicted_positive))/len(predicted_positive)
+    
+    # fall-out
+    fall_out = len(np.intersect1d(predicted_positive, condition_negative))/len(condition_negative)
+    
+    # recall
+    recall = len(np.intersect1d(condition_positive, predicted_positive))/len(condition_positive)
+    
+    print("Anomalies: ", condition_positive.T)
+    print("Anomalies Detected: ", predicted_positive.T)
+    print("Precision: ", precision)
+    print("Fallout: ", fall_out)
+    print("Recall: ", recall)               

@@ -19,19 +19,19 @@ if __name__ == '__main__':
     # reset computational graph
     tf.reset_default_graph()
         
-    batch_size = 3
-    sequence_len = 10
+    batch_size = 5
+    sequence_len = 20
     stride = 3
-    learning_rate = 1e-2
-    epochs = 10
+    learning_rate = 5e-3
+    epochs = 25
     
     # define convolutional layer(s)
     kernel_size = 3
-    number_of_filters = 35  # number of convolutions' filters for each LSTM cells
+    number_of_filters = 100  # number of convolutions' filters for each LSTM cells
     stride_conv = 1
     
     # define lstm elements
-    number_of_lstm_units = 50  # number of hidden units in each lstm
+    number_of_lstm_units = 75  # number of hidden units in each lstm
     
     
     # define input/output pairs
@@ -90,9 +90,10 @@ if __name__ == '__main__':
     # dense layer: prediction
     prediction = tf.tensordot(tf.reshape(outputs, shape=(batch_size, number_of_lstm_units)), weights_dense, 2) + bias_dense
     
-    # exponential decay of the predictions
-    decay = tf.constant(np.array([2**(-i) for i in range(batch_size)], dtype='float32')[::-1])
-    prediction_with_decay = prediction*decay
+#    # (optional) exponential decay of the predictions
+#    decay = tf.constant(np.array([2**(-i) for i in range(batch_size)], dtype='float32')[::-1])
+#    prediction_with_decay = prediction*decay
+    prediction_with_decay = prediction
 
     # loss evaluation
     # calculate loss (L2, MSE, huber, hinge, sMAPE: leave uncommented one of them)
@@ -201,7 +202,7 @@ if __name__ == '__main__':
         # anomalies' statistics
         gaussian_error_statistics = np.zeros(shape=(len(predictions), batch_size))
         errors_test = np.zeros(shape=(len(predictions), batch_size))
-        threshold = [scistats.norm.pdf(mean-2.*std, mean, std) for (mean, std) in zip(means_valid, stds_valid)]
+        threshold = [scistats.norm.pdf(mean-2.5*std, mean, std) for (mean, std) in zip(means_valid, stds_valid)]
         anomalies = np.array([np.array([False for _ in range(batch_size)]) for _ in range(len(y_test))])
         
         iter_ = 0
@@ -287,5 +288,37 @@ if __name__ == '__main__':
     plt.show()
     
     # errors on test
-    print("\nTest errors:")
-    plt.hist(np.array(errors_test).ravel(), bins=30)                
+    print("\nTest errors' histogram:")
+    plt.hist(np.array(errors_test).ravel(), bins=30)
+
+    # performances
+    target_anomalies = np.zeros(shape=int(np.floor(x_test.shape[0] / batch_size))*batch_size)
+
+    
+    # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
+    target_anomalies[500:580] = 1
+    
+    # real values
+    condition_positive = np.argwhere(target_anomalies == 1)
+    condition_negative = np.argwhere(target_anomalies == 0)
+    
+    # predictions
+    predicted_positive = anomalies
+    predicted_negative = np.setdiff1d(np.array([i for i in range(len(target_anomalies))]), 
+                                      predicted_positive,
+                                      assume_unique=True)
+    
+    # precision
+    precision = len(np.intersect1d(condition_positive, predicted_positive))/len(predicted_positive)
+    
+    # fall-out
+    fall_out = len(np.intersect1d(predicted_positive, condition_negative))/len(condition_negative)
+    
+    # recall
+    recall = len(np.intersect1d(condition_positive, predicted_positive))/len(condition_positive)
+    
+    print("Anomalies: ", condition_positive.T)
+    print("Anomalies Detected: ", predicted_positive.T)
+    print("Precision: ", precision)
+    print("Fallout: ", fall_out)
+    print("Recall: ", recall)             

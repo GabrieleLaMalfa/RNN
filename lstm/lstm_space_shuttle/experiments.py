@@ -18,8 +18,8 @@ if __name__ == '__main__':
 
     results = LSTM_exp.lstm_exp(filename=DATA_PATH, 
                                 num_units=75, 
-                                window=15,
-                                stride=3,
+                                window=20,
+                                stride=1,
                                 batch_size=5,
                                 l_rate=1e-3, 
                                 non_train_percentage=0.5, 

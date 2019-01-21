@@ -20,14 +20,14 @@ if __name__ == '__main__':
     tf.reset_default_graph()
         
     batch_size = 5
-    sequence_len = 10
+    sequence_len = 5
     stride = 1
-    learning_rate = 1e-2
+    learning_rate = 3e-2
     epochs = 5
     
     # define convolutional layer(s)
     kernel_size = 2
-    number_of_filters = 10  # number of convolutions' filters for each LSTM cells
+    number_of_filters = 15  # number of convolutions' filters for each LSTM cells
     stride_conv = 1
     
     # define lstm elements
@@ -289,4 +289,37 @@ if __name__ == '__main__':
     
     # errors on test
     print("\nTest errors:")
-    plt.hist(np.array(errors_test).ravel(), bins=30)                
+    plt.hist(np.array(errors_test).ravel(), bins=30) 
+
+    # performances
+    target_anomalies = np.zeros(shape=int(np.floor(x_test.shape[0] / batch_size))*batch_size)
+    
+    # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
+    # train 50%, validation_relative 50%
+    target_anomalies[1028] = target_anomalies[1029] = 1
+    target_anomalies[1129] = target_anomalies[1130] = 1    
+    
+    # real values
+    condition_positive = np.argwhere(target_anomalies == 1)
+    condition_negative = np.argwhere(target_anomalies == 0)
+    
+    # predictions
+    predicted_positive = anomalies
+    predicted_negative = np.setdiff1d(np.array([i for i in range(len(target_anomalies))]), 
+                                      predicted_positive,
+                                      assume_unique=True)
+    
+    # precision
+    precision = len(np.intersect1d(condition_positive, predicted_positive))/len(predicted_positive)
+    
+    # fall-out
+    fall_out = len(np.intersect1d(predicted_positive, condition_negative))/len(condition_negative)
+    
+    # recall
+    recall = len(np.intersect1d(condition_positive, predicted_positive))/len(condition_positive)
+    
+    print("Anomalies: ", condition_positive.T)
+    print("Anomalies Detected: ", predicted_positive.T)
+    print("Precision: ", precision)
+    print("Fallout: ", fall_out)
+    print("Recall: ", recall)                
