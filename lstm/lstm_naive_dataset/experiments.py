@@ -17,9 +17,9 @@ if __name__ == '__main__':
     # model parameters
     DATA_PATH = 'naive_dataset.csv'
     num_units = 35
-    window = 3
+    window = 5
     stride = 1
-    batch_size = 5
+    batch_size = 3
     l_rate = 1e-2 
     non_train_percentage = 0.5 
     training_epochs = 10
@@ -63,7 +63,7 @@ if __name__ == '__main__':
 
         if tmp <= anomaly_threshold:
 
-            print("\tPoint number ", i, " is an anomaly: P(x) is ", tmp)
+            print("\tPoint number ", i, " is an anomaly: pdf is ", tmp)
             list_anomalies.append(i)
 
     # plot results
@@ -134,8 +134,7 @@ if __name__ == '__main__':
     
     # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
     # train 50%, validation_relative 50%
-    target_anomalies[1028] = target_anomalies[1029] = 1
-    target_anomalies[1129] = target_anomalies[1130] = 1
+    target_anomalies[1044:1047] = target_anomalies[1145:1147] = 1
     
     # real values
     condition_positive = np.argwhere(target_anomalies == 1)
@@ -147,13 +146,13 @@ if __name__ == '__main__':
                                       predicted_positive,
                                       assume_unique=True)
     
-    # precision
+    # precision: fraction of true anomalies among the anomalies raised by the model
     precision = len(np.intersect1d(condition_positive, predicted_positive))/len(predicted_positive)
     
-    # fall-out
+    # fall-out: probability of raising a 'false alarm'
     fall_out = len(np.intersect1d(predicted_positive, condition_negative))/len(condition_negative)
     
-    # recall
+    # recall: probability of detection of an anomaly
     recall = len(np.intersect1d(condition_positive, predicted_positive))/len(condition_positive)
     
     print("Anomalies: ", condition_positive.T)

@@ -18,8 +18,8 @@ if __name__ == '__main__':
     DATA_PATH = 'sin.csv'
     num_units = 35
     window = 10
-    stride = 1
-    batch_size = 3
+    stride = 2
+    batch_size = 5
     l_rate = 1e-2 
     non_train_percentage = 0.5 
     training_epochs = 10
@@ -134,8 +134,10 @@ if __name__ == '__main__':
     
     # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
     # train 50%, validation_relative 50%
-    target_anomalies[860:909] = target_anomalies[1111:1140] = 1
-    target_anomalies[1561:1599] = target_anomalies[1906:1945] = 1
+    target_anomalies[870:876] = target_anomalies[919:925] = 1
+    target_anomalies[1121:1127] = target_anomalies[1150:1156] = 1
+    target_anomalies[1571:1577] = target_anomalies[1610:1616] = 1
+    target_anomalies[1916:1922] = target_anomalies[1942:1948] = 1
     
     # real values
     condition_positive = np.argwhere(target_anomalies == 1)
