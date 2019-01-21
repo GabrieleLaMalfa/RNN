@@ -14,21 +14,33 @@ import anomaly_detection as LSTM_exp
 
 if __name__ == '__main__':
 
+    # model parameters
     DATA_PATH = 'naive_dataset.csv'
+    num_units = 35
+    window = 3
+    stride = 1
+    batch_size = 5
+    l_rate = 1e-2 
+    non_train_percentage = 0.5 
+    training_epochs = 10
+    val_rel_percentage = .5
+    normalize = True
+    time_difference = True
+    td_method = None
 
     results = LSTM_exp.lstm_exp(filename=DATA_PATH, 
-                                num_units=35, 
-                                window=3,
-                                stride=1,
-                                batch_size=5,
-                                l_rate=1e-2, 
-                                non_train_percentage=0.5, 
-                                training_epochs=10,
+                                num_units=num_units, 
+                                window=window,
+                                stride=stride,
+                                batch_size=batch_size,
+                                l_rate=l_rate, 
+                                non_train_percentage=non_train_percentage, 
+                                training_epochs=training_epochs,
                                 l_rate_test=.05, 
-                                val_rel_percentage=.5,
-                                normalize=True,
-                                time_difference=True,
-                                td_method=None)
+                                val_rel_percentage=val_rel_percentage,
+                                normalize=normalize,
+                                time_difference=time_difference,
+                                td_method=td_method)
 
     # MLE on validation: estimate mean and variance
     val_errors = np.concatenate(results['Validation_Errors']).ravel()
@@ -112,8 +124,41 @@ if __name__ == '__main__':
 
     fig.tight_layout()
     plt.show()
-    
+
     # errors on test
     print("\nTest errors:")
-    plt.plot(np.array(results['Test_Errors']).ravel())
+    plt.hist(np.array(results['Test_Errors']).ravel(), bins=30) 
+
+    # performances
+    target_anomalies = np.zeros(shape=int(np.floor(plot_y.shape[0] / batch_size))*batch_size)
+    
+    # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
+    # train 50%, validation_relative 50%
+    target_anomalies[1028] = target_anomalies[1029] = 1
+    target_anomalies[1129] = target_anomalies[1130] = 1
+    
+    # real values
+    condition_positive = np.argwhere(target_anomalies == 1)
+    condition_negative = np.argwhere(target_anomalies == 0)
+    
+    # predictions
+    predicted_positive = np.array([list_anomalies]).T
+    predicted_negative = np.setdiff1d(np.array([i for i in range(len(target_anomalies))]), 
+                                      predicted_positive,
+                                      assume_unique=True)
+    
+    # precision
+    precision = len(np.intersect1d(condition_positive, predicted_positive))/len(predicted_positive)
+    
+    # fall-out
+    fall_out = len(np.intersect1d(predicted_positive, condition_negative))/len(condition_negative)
+    
+    # recall
+    recall = len(np.intersect1d(condition_positive, predicted_positive))/len(condition_positive)
+    
+    print("Anomalies: ", condition_positive.T)
+    print("Anomalies Detected: ", predicted_positive.T)
+    print("Precision: ", precision)
+    print("Fallout: ", fall_out)
+    print("Recall: ", recall)  
     

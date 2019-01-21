@@ -2,7 +2,7 @@
 """
 Created on Sat Nov 24 15:27:05 2018
 
-@author: Emanuele
+@author: Gabriele
 """
 
 import numpy as np
@@ -14,11 +14,12 @@ import anomaly_detection as LSTM_exp
 
 if __name__ == '__main__':
 
-    DATA_PATH = 'space_shuttle_marotta_valve.csv'
+    # model parameters
+    DATA_PATH = 'sin.csv'
     num_units = 35
-    window = 3
+    window = 10
     stride = 1
-    batch_size = 5
+    batch_size = 3
     l_rate = 1e-2 
     non_train_percentage = 0.5 
     training_epochs = 10
@@ -123,7 +124,7 @@ if __name__ == '__main__':
 
     fig.tight_layout()
     plt.show()
-    
+
     # errors on test
     print("\nTest errors:")
     plt.hist(np.array(results['Test_Errors']).ravel(), bins=30) 
@@ -133,8 +134,8 @@ if __name__ == '__main__':
     
     # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
     # train 50%, validation_relative 50%
-    target_anomalies[1028] = target_anomalies[1029] = 1
-    target_anomalies[1129] = target_anomalies[1130] = 1
+    target_anomalies[860:909] = target_anomalies[1111:1140] = 1
+    target_anomalies[1561:1599] = target_anomalies[1906:1945] = 1
     
     # real values
     condition_positive = np.argwhere(target_anomalies == 1)
@@ -159,4 +160,5 @@ if __name__ == '__main__':
     print("Anomalies Detected: ", predicted_positive.T)
     print("Precision: ", precision)
     print("Fallout: ", fall_out)
-    print("Recall: ", recall)    
+    print("Recall: ", recall)  
+    
