@@ -15,13 +15,13 @@ import anomaly_detection as LSTM_exp
 if __name__ == '__main__':
 
     DATA_PATH = 'space_shuttle_marotta_valve.csv'
-    num_units = 35
-    window = 3
-    stride = 1
-    batch_size = 5
+    num_units = 100
+    window = 8
+    stride = 3
+    batch_size = 10
     l_rate = 1e-2 
     non_train_percentage = 0.5 
-    training_epochs = 10
+    training_epochs = 25
     val_rel_percentage = .5
     normalize = True
     time_difference = True
@@ -47,7 +47,7 @@ if __name__ == '__main__':
     std = np.std(val_errors)
     
     # Anomaly detection
-    sigma_threshold = 3.  # /tau
+    sigma_threshold = 6.  # /tau
     anomaly_threshold = scistats.norm.pdf(mean-sigma_threshold*std, mean, std)
 
     # turn test errors into a numpy array
@@ -133,8 +133,7 @@ if __name__ == '__main__':
     
     # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
     # train 50%, validation_relative 50%
-    target_anomalies[1028] = target_anomalies[1029] = 1
-    target_anomalies[1129] = target_anomalies[1130] = 1
+    target_anomalies[530:540] = 1
     
     # real values
     condition_positive = np.argwhere(target_anomalies == 1)

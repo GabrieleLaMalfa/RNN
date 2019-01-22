@@ -20,18 +20,18 @@ if __name__ == '__main__':
     tf.reset_default_graph()
         
     batch_size = 10
-    sequence_len = 5
-    stride = 2
-    learning_rate = 5e-4
-    epochs = 10
+    sequence_len = 8
+    stride = 3
+    learning_rate = 1e-3
+    epochs = 25
     
     # define convolutional layer(s)
     kernel_size = 3
-    number_of_filters = 20  # number of convolutions' filters for each LSTM cells
+    number_of_filters = 25  # number of convolutions' filters for each LSTM cells
     stride_conv = 1
     
     # define lstm elements
-    number_of_lstm_units = 35  # number of hidden units in each lstm
+    number_of_lstm_units = 50  # number of hidden units in each lstm
     
     
     # define input/output pairs
@@ -93,15 +93,15 @@ if __name__ == '__main__':
     
     # exponential decay of the predictions
     decay = tf.constant(np.array([2**(-i) for i in range(batch_size)], dtype='float32')[::-1])
-    prediction_with_decay = prediction*decay
+    prediction = prediction*decay
 
     # loss evaluation
     # calculate loss (L2, MSE, huber, hinge, sMAPE: leave uncommented one of them)
-    loss = tf.nn.l2_loss(target-prediction_with_decay)
-#    loss = tf.losses.mean_squared_error(target, prediction_with_decay)
-#    loss = tf.losses.huber_loss(target, prediction_with_decay, delta=.25)
-#    loss = tf.losses.hinge_loss(target, prediction_with_decay)
-#    loss = (200/batch_size)*tf.reduce_mean(tf.abs(target-prediction_with_decay))/tf.reduce_mean(target+prediction_with_decay)
+    loss = tf.nn.l2_loss(target-prediction)
+#    loss = tf.losses.mean_squared_error(target, prediction)
+#    loss = tf.losses.huber_loss(target, prediction, delta=.25)
+#    loss = tf.losses.hinge_loss(target, prediction)
+#    loss = (200/batch_size)*tf.reduce_mean(tf.abs(target-prediction))/tf.reduce_mean(target+prediction)
     
     # optimization algorithm
     optimizer = tf.train.AdamOptimizer(learning_rate).minimize(loss)        
@@ -295,7 +295,8 @@ if __name__ == '__main__':
     target_anomalies = np.zeros(shape=int(np.floor(x_test.shape[0] / batch_size))*batch_size)
     
     # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
-    target_anomalies[4500:4800] = 1
+    # train 50%, validation_relative 50%
+    target_anomalies[530:540] = 1
     
     # real values
     condition_positive = np.argwhere(target_anomalies == 1)
