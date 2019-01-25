@@ -19,22 +19,22 @@ if __name__ == '__main__':
     # reset computational graph
     tf.reset_default_graph()
         
-    batch_size = 5
-    sequence_len = 15
-    stride = 1
-    learning_rate = 1e-4
+    batch_size = 10
+    sequence_len = 8
+    stride = 2
+    learning_rate = 2e-3
     epochs = 10
     
     # define convolutional layer(s)
-    kernel_size = 2
-    number_of_filters = 5  # number of convolutions' filters for each LSTM cells
-    stride_conv = 1
+    kernel_size = 3
+    number_of_filters = 35  # number of convolutions' filters for each LSTM cells
+    stride_conv = 2
     
     # define lstm elements
-    number_of_lstm_units = 35  # number of hidden units in each lstm
+    number_of_lstm_units = 50  # number of hidden units in each lstm
     
-    prediction_threshold = 3.
-    n_mixtures = 1    
+    prediction_threshold = 5.
+    n_mixtures = 1  
     
     # define input/output pairs
     input_ = tf.placeholder(tf.float32, [None, sequence_len, batch_size])  # (batch, input, time)
@@ -69,7 +69,7 @@ if __name__ == '__main__':
     cell = tf.nn.rnn_cell.LSTMCell(number_of_lstm_units, 
                                    forget_bias=1.,
                                    state_is_tuple=True,
-                                   activation=tf.nn.tanh,
+                                   activation=tf.nn.relu,
                                    initializer=tf.contrib.layers.xavier_initializer())
     
     initial_state = cell.zero_state(1, tf.float32)
@@ -298,7 +298,7 @@ if __name__ == '__main__':
     
     # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
     # train 50%, validation_relative 50%
-    target_anomalies[530:540] = 1
+    target_anomalies[520:540] = target_anomalies[630:640] = 1
     
     # real values
     condition_positive = np.argwhere(target_anomalies == 1)

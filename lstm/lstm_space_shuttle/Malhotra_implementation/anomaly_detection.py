@@ -214,22 +214,18 @@ def lstm_exp(filename,
     x = tf.placeholder("float", [None, batch_size, window]) # (batch, time, input)
     y = tf.placeholder("float", [None, batch_size])  # (batch, output)
 
-    # define the LSTM cells
-    cell = tf.nn.rnn_cell.LSTMCell(num_units, 
-                                   forget_bias=1.,
-                                   state_is_tuple=True,
-                                   activation=tf.nn.tanh,
-                                   initializer=tf.contrib.layers.xavier_initializer())
+    # define the LSTM cells (2 horizontal layers in Malhotra's experiments)
+    cells = [tf.contrib.rnn.LSTMCell(num_units) for _ in range(2)]
     
-    initial_state = cell.zero_state(1, tf.float32)
-    outputs, _ = tf.nn.dynamic_rnn(cell, 
+    multi_rnn_cell = tf.nn.rnn_cell.MultiRNNCell(cells)
+    
+    outputs, _ = tf.nn.dynamic_rnn(multi_rnn_cell, 
                                    x,
-                                   initial_state=initial_state,
                                    dtype="float32")
 
     # dense layer: prediction
     y_hat = tf.tensordot(tf.reshape(outputs, shape=(batch_size, num_units)), weights, 2) + bias
-#    y_hat = tf.nn.tanh(y_hat)
+#    y_hat = tf.nn.sigmoid(y_hat)
     
     # calculate loss (L2, MSE, huber, hinge or sMAPE, leave uncommented one of them)
     loss = tf.nn.l2_loss(y-y_hat)

@@ -20,18 +20,18 @@ if __name__ == '__main__':
     tf.reset_default_graph()
         
     batch_size = 10
-    sequence_len = 8
+    sequence_len = 15
     stride = 3
-    learning_rate = 1e-3
-    epochs = 25
+    learning_rate = 1e-5
+    epochs = 5
     
     # define convolutional layer(s)
     kernel_size = 3
-    number_of_filters = 25  # number of convolutions' filters for each LSTM cells
+    number_of_filters = 35  # number of convolutions' filters for each LSTM cells
     stride_conv = 1
     
     # define lstm elements
-    number_of_lstm_units = 50  # number of hidden units in each lstm
+    number_of_lstm_units = 64  # number of hidden units in each lstm
     
     
     # define input/output pairs
@@ -112,10 +112,10 @@ if __name__ == '__main__':
                                                              window=sequence_len,
                                                              stride=stride,
                                                              mode='validation', 
-                                                             non_train_percentage=.3,
-                                                             val_rel_percentage=.5,
+                                                             non_train_percentage=.5,
+                                                             val_rel_percentage=.7,
                                                              normalize=True,
-                                                             time_difference=True,
+                                                             time_difference=False,
                                                              td_method=None)
     
     # suppress second axis on Y values (the algorithms expects shapes like (n,) for the prediction)
@@ -295,8 +295,8 @@ if __name__ == '__main__':
     target_anomalies = np.zeros(shape=int(np.floor(x_test.shape[0] / batch_size))*batch_size)
     
     # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
-    # train 50%, validation_relative 50%
-    target_anomalies[530:540] = 1
+    # train 50%, validation_relative 70%
+    target_anomalies[4500:4700] = 1
     
     # real values
     condition_positive = np.argwhere(target_anomalies == 1)

@@ -14,12 +14,12 @@ import anomaly_detection as LSTM_exp
 
 if __name__ == '__main__':
 
-    DATA_PATH = 'space_shuttle_marotta_valve.csv'
-    num_units = 75
+    DATA_PATH = '../space_shuttle_marotta_valve.csv'
+    num_units = 30
     window = 8
     stride = 3
-    batch_size = 10
-    l_rate = 1e-2
+    batch_size = 5
+    l_rate = 1e-3
     non_train_percentage = 0.5 
     training_epochs = 10
     val_rel_percentage = .5

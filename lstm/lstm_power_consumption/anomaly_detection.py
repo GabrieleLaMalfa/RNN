@@ -229,12 +229,12 @@ def lstm_exp(filename,
 
     # dense layer: prediction
     y_hat = tf.tensordot(tf.reshape(outputs, shape=(batch_size, num_units)), weights, 2) + bias
-#    y_hat = tf.nn.tanh(y_hat)
+#    y_hat = tf.nn.sigmoid(y_hat)
     
     # calculate loss (L2, MSE, huber, hinge or sMAPE, leave uncommented one of them)
-    loss = tf.nn.l2_loss(y-y_hat)
+#    loss = tf.nn.l2_loss(y-y_hat)
 #    loss = tf.losses.mean_squared_error(y, y_hat)
-#    loss = tf.losses.huber_loss(y, y_hat, delta=.25)
+    loss = tf.losses.huber_loss(y, y_hat, delta=.25)
 #    loss = tf.losses.hinge_loss(y, y_hat)
 #    loss = (200/batch_size)*tf.reduce_mean(tf.abs(y-y_hat))/tf.reduce_mean(y+y_hat)
     
