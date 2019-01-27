@@ -21,9 +21,10 @@ if __name__ == '__main__':
         
     batch_size = 10
     sequence_len = 15
-    stride = 3
-    learning_rate = 1e-5
+    stride = 4
+    learning_rate = 1e-2
     epochs = 5
+    sigma_threshold = 3.85  # /tau
     
     # define convolutional layer(s)
     kernel_size = 3
@@ -31,7 +32,7 @@ if __name__ == '__main__':
     stride_conv = 1
     
     # define lstm elements
-    number_of_lstm_units = 64  # number of hidden units in each lstm
+    number_of_lstm_units = 35  # number of hidden units in each lstm
     
     
     # define input/output pairs
@@ -57,7 +58,7 @@ if __name__ == '__main__':
     layer_conv = tf.add(layer_conv, bias_conv)
               
     # non-linear activation before lstm feeding                
-    layer_conv = tf.nn.leaky_relu(layer_conv)    
+    layer_conv = tf.nn.tanh(layer_conv)    
 
     # reshape the output so it can be feeded to the lstm (batch, time, input)
     number_of_lstm_inputs = layer_conv.get_shape().as_list()[1]
@@ -89,11 +90,11 @@ if __name__ == '__main__':
     
     # dense layer: prediction
     prediction = tf.tensordot(tf.reshape(outputs, shape=(batch_size, number_of_lstm_units)), weights_dense, 2) + bias_dense
-    prediction = tf.nn.tanh(prediction)
+#    prediction = tf.nn.tanh(prediction)
     
-    # exponential decay of the predictions
-    decay = tf.constant(np.array([2**(-i) for i in range(batch_size)], dtype='float32')[::-1])
-    prediction = prediction*decay
+#    # exponential decay of the predictions
+#    decay = tf.constant(np.array([2**(-i) for i in range(batch_size)], dtype='float32')[::-1])
+#    prediction = prediction*decay
 
     # loss evaluation
     # calculate loss (L2, MSE, huber, hinge, sMAPE: leave uncommented one of them)
@@ -112,15 +113,15 @@ if __name__ == '__main__':
                                                              window=sequence_len,
                                                              stride=stride,
                                                              mode='validation', 
-                                                             non_train_percentage=.5,
-                                                             val_rel_percentage=.7,
+                                                             non_train_percentage=.3,
+                                                             val_rel_percentage=.8,
                                                              normalize=True,
-                                                             time_difference=False,
-                                                             td_method=None)
+                                                             time_difference=True,
+                                                             td_method=np.log2)
     
     # suppress second axis on Y values (the algorithms expects shapes like (n,) for the prediction)
     y_train = y_train[:,0]; y_valid = y_valid[:,0]; y_test = y_test[:,0]
-    
+        
     # if the dimensions mismatch (somehow, due tu bugs in generate_batches function,
     #  make them match)
     mismatch = False
@@ -202,7 +203,7 @@ if __name__ == '__main__':
         # anomalies' statistics
         gaussian_error_statistics = np.zeros(shape=(len(predictions), batch_size))
         errors_test = np.zeros(shape=(len(predictions), batch_size))
-        threshold = [scistats.norm.pdf(mean-3.*std, mean, std) for (mean, std) in zip(means_valid, stds_valid)]
+        threshold = [scistats.norm.pdf(mean-sigma_threshold*std, mean, std) for (mean, std) in zip(means_valid, stds_valid)]
         anomalies = np.array([np.array([False for _ in range(batch_size)]) for _ in range(len(y_test))])
         
         iter_ = 0
@@ -227,8 +228,13 @@ if __name__ == '__main__':
                 anomalies[iter_, i] = (True if (gaussian_error_statistics[iter_, i] < threshold[index]) else False)
             
             iter_ +=  1
+               
+        # highlights anomalies
+        anomalies = np.argwhere(anomalies.flatten() == True)
         
-        anomalies = np.argwhere(anomalies.flatten() == True)            
+        # ignore the anomaly evalution if we are considering the last samples, since it may
+        #  rise some difficulties the logarithm as time_difference in the last y_test's points
+        anomalies = anomalies[anomalies < len(y_test)-15]
     
     errors_test = errors_test.flatten()
     predictions = predictions.flatten()
@@ -295,8 +301,8 @@ if __name__ == '__main__':
     target_anomalies = np.zeros(shape=int(np.floor(x_test.shape[0] / batch_size))*batch_size)
     
     # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
-    # train 50%, validation_relative 70%
-    target_anomalies[4500:4700] = 1
+    # train 70%, validation_relative 80%
+    target_anomalies[1400:1600] = 1
     
     # real values
     condition_positive = np.argwhere(target_anomalies == 1)

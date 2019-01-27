@@ -47,7 +47,7 @@ if __name__ == '__main__':
     std = np.std(val_errors)
     
     # Anomaly detection
-    sigma_threshold = 3.  # /tau
+    sigma_threshold = 5.  # /tau
     anomaly_threshold = scistats.norm.pdf(mean-sigma_threshold*std, mean, std)
 
     # turn test errors into a numpy array
@@ -60,7 +60,9 @@ if __name__ == '__main__':
 
         tmp = scistats.norm.pdf(test_errors[i], mean, std)
 
-        if tmp <= anomaly_threshold:
+        # don't consider the last samples as anomalies since the logarithm as 
+        #  time_difference method may 'corrupt' them (and there are NO anomalies there)
+        if tmp <= anomaly_threshold and i<len(test_errors)-15:
 
             print("\tPoint number ", i, " is an anomaly: P(x) is ", tmp)
             list_anomalies.append(i)
@@ -133,7 +135,7 @@ if __name__ == '__main__':
     
     # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
     # train 70%, validation_relative 80%
-    target_anomalies[1400:1700] = 1
+    target_anomalies[1400:1600] = 1
     
     # real values
     condition_positive = np.argwhere(target_anomalies == 1)
