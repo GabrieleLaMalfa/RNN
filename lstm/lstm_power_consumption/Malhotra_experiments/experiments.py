@@ -16,7 +16,7 @@ if __name__ == '__main__':
 
     DATA_PATH = '../power_consumption.csv'
     num_units = 25
-    window = 15
+    window = 8
     stride = 3
     batch_size = 10
     l_rate = 1e-2
