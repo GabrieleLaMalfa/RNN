@@ -14,14 +14,14 @@ import anomaly_detection as LSTM_exp
 
 if __name__ == '__main__':
 
-    DATA_PATH = 'power_consumption.csv'
-    num_units = 64
+    DATA_PATH = '../power_consumption.csv'
+    num_units = 25
     window = 8
     stride = 3
     batch_size = 10
-    l_rate = 5e-3
+    l_rate = 1e-2
     non_train_percentage = 0.3
-    training_epochs = 5
+    training_epochs = 10
     val_rel_percentage = .8
     normalize = True
     time_difference = True
@@ -47,7 +47,7 @@ if __name__ == '__main__':
     std = np.std(val_errors)
     
     # Anomaly detection
-    sigma_threshold = 3.  # /tau
+    sigma_threshold = 5.  # /tau
     anomaly_threshold = scistats.norm.pdf(mean-sigma_threshold*std, mean, std)
 
     # turn test errors into a numpy array

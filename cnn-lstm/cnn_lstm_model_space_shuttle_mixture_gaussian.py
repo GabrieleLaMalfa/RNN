@@ -20,7 +20,7 @@ if __name__ == '__main__':
     tf.reset_default_graph()
         
     batch_size = 10
-    sequence_len = 8
+    sequence_len = 15
     stride = 2
     learning_rate = 2e-3
     epochs = 10
@@ -28,12 +28,12 @@ if __name__ == '__main__':
     # define convolutional layer(s)
     kernel_size = 3
     number_of_filters = 35  # number of convolutions' filters for each LSTM cells
-    stride_conv = 2
+    stride_conv = 1
     
     # define lstm elements
     number_of_lstm_units = 50  # number of hidden units in each lstm
     
-    prediction_threshold = 5.
+    prediction_threshold = 5.75
     n_mixtures = 1  
     
     # define input/output pairs
@@ -69,7 +69,7 @@ if __name__ == '__main__':
     cell = tf.nn.rnn_cell.LSTMCell(number_of_lstm_units, 
                                    forget_bias=1.,
                                    state_is_tuple=True,
-                                   activation=tf.nn.relu,
+                                   activation=tf.nn.tanh,
                                    initializer=tf.contrib.layers.xavier_initializer())
     
     initial_state = cell.zero_state(1, tf.float32)
@@ -91,7 +91,7 @@ if __name__ == '__main__':
     
     # dense layer: prediction
     prediction = tf.tensordot(tf.reshape(outputs, shape=(batch_size, number_of_lstm_units)), weights_dense, 2) + bias_dense
-    prediction = tf.nn.tanh(prediction)
+#    prediction = tf.nn.tanh(prediction)
     
 #    # exponential decay of the predictions
 #    decay = tf.constant(np.array([2**(-i) for i in range(batch_size)], dtype='float32')[::-1])
