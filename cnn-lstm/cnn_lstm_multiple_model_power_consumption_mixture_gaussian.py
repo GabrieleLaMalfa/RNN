@@ -20,20 +20,21 @@ if __name__ == '__main__':
     tf.reset_default_graph()
         
     batch_size = 10
-    sequence_len = 15
+    sequence_len = 16
     stride = 2
-    learning_rate = 1e-1
+    learning_rate = 5e-4
     epochs = 5
-    sigma_threshold = 3.  # /tau
+    sigma_threshold = 5.  # /tau
+    n_mixtures = 1  # number of gaussian mixtures that appoximate the validation error
     
     # define first convolutional layer(s)
-    kernel_size_first = 3
+    kernel_size_first = 2
     number_of_filters_first = 35  # number of convolutions' filters for each LSTM cells
-    stride_conv_first = 1
+    stride_conv_first = 2
 
     # define second convolutional layer(s)
-    kernel_size_second = 2
-    number_of_filters_second = 25  # number of convolutions' filters for each LSTM cells
+    kernel_size_second = 3
+    number_of_filters_second = 55  # number of convolutions' filters for each LSTM cells
     stride_conv_second = 1
     
     # define lstm elements
@@ -94,16 +95,10 @@ if __name__ == '__main__':
     layer_conv_flatten = tf.reshape(layer_conv_second, (-1, batch_size, number_of_lstm_inputs))
         
     # define the LSTM cells
-    cell = tf.nn.rnn_cell.LSTMCell(number_of_lstm_units, 
-                                   forget_bias=1.,
-                                   state_is_tuple=True,
-                                   activation=tf.nn.tanh,
-                                   initializer=tf.contrib.layers.xavier_initializer())
-    
-    initial_state = cell.zero_state(1, tf.float32)
-    outputs, _ = tf.nn.dynamic_rnn(cell, 
+    cells = [tf.contrib.rnn.LSTMCell(number_of_lstm_units) for _ in range(2)]
+    multi_rnn_cell = tf.nn.rnn_cell.MultiRNNCell(cells)    
+    outputs, _ = tf.nn.dynamic_rnn(multi_rnn_cell, 
                                    layer_conv_flatten,
-                                   initial_state=initial_state,
                                    dtype="float32")
         
     # dense layer extraction
@@ -217,7 +212,6 @@ if __name__ == '__main__':
         # estimate mean and deviation of the errors' vector
         #  since we have a batch size that may be different from 1 and we consider
         #   the error of each last batch_y, we need to cut off the zero values
-        n_mixtures = 1
         errors_valid = errors_valid[:iter_].flatten()
         gaussian_mixture = mixture.GaussianMixture(n_components=n_mixtures)
         gm = gaussian_mixture.fit(errors_valid.reshape(-1, 1))

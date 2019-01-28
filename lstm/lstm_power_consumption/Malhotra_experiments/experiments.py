@@ -16,10 +16,10 @@ if __name__ == '__main__':
 
     DATA_PATH = '../power_consumption.csv'
     num_units = 25
-    window = 8
+    window = 15
     stride = 3
     batch_size = 10
-    l_rate = 1e-2
+    l_rate = 5e-2
     non_train_percentage = 0.3
     training_epochs = 10
     val_rel_percentage = .8

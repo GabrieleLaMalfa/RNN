@@ -215,10 +215,8 @@ def lstm_exp(filename,
     y = tf.placeholder("float", [None, batch_size])  # (batch, output)
 
     # define the LSTM cells (2 horizontal layers in Malhotra's experiments)
-    cells = [tf.contrib.rnn.LSTMCell(num_units) for _ in range(2)]
-    
-    multi_rnn_cell = tf.nn.rnn_cell.MultiRNNCell(cells)
-    
+    cells = [tf.contrib.rnn.LSTMCell(num_units) for _ in range(2)]    
+    multi_rnn_cell = tf.nn.rnn_cell.MultiRNNCell(cells)    
     outputs, _ = tf.nn.dynamic_rnn(multi_rnn_cell,
                                    x,
                                    dtype="float32")
