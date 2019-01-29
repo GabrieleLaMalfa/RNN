@@ -19,26 +19,26 @@ if __name__ == '__main__':
     # reset computational graph
     tf.reset_default_graph()
         
-    batch_size = 10
-    sequence_len = 16
-    stride = 2
+    batch_size = 5
+    sequence_len = 10
+    stride = 10
     learning_rate = 5e-4
-    epochs = 5
-    sigma_threshold = 5.  # /tau
+    epochs = 25
+    sigma_threshold = 4.5  # /tau
     n_mixtures = 1  # number of gaussian mixtures that appoximate the validation error
     
     # define first convolutional layer(s)
     kernel_size_first = 2
     number_of_filters_first = 35  # number of convolutions' filters for each LSTM cells
-    stride_conv_first = 2
+    stride_conv_first = 1
 
     # define second convolutional layer(s)
-    kernel_size_second = 3
-    number_of_filters_second = 55  # number of convolutions' filters for each LSTM cells
+    kernel_size_second = 2
+    number_of_filters_second = 20  # number of convolutions' filters for each LSTM cells
     stride_conv_second = 1
     
     # define lstm elements
-    number_of_lstm_units = 35  # number of hidden units in each lstm
+    number_of_lstm_units = 64  # number of hidden units in each lstm
     
     
     # define input/output pairs
