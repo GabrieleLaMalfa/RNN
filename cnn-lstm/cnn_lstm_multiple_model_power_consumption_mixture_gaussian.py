@@ -20,11 +20,11 @@ if __name__ == '__main__':
     tf.reset_default_graph()
         
     batch_size = 5
-    sequence_len = 10
+    sequence_len = 35
     stride = 10
-    learning_rate = 5e-4
+    learning_rate = 1e-2
     epochs = 25
-    sigma_threshold = 4.5  # /tau
+    sigma_threshold = 5.  # /tau
     n_mixtures = 1  # number of gaussian mixtures that appoximate the validation error
     
     # define first convolutional layer(s)
@@ -65,7 +65,13 @@ if __name__ == '__main__':
     layer_conv_first = tf.add(layer_conv_first, bias_conv_first)
               
     # non-linear activation before lstm feeding                
-    layer_conv_first = tf.nn.relu(layer_conv_first)  
+    layer_conv_first = tf.nn.relu(layer_conv_first)
+    
+    # pooling
+    layer_conv_first = tf.layers.max_pooling1d(layer_conv_first,
+                                               pool_size=2,
+                                               strides=2,                                               
+                                               padding='SAME')
     
     #
     # second cnn layer
@@ -90,6 +96,12 @@ if __name__ == '__main__':
     # non-linear activation before lstm feeding                
     layer_conv_second = tf.nn.relu(layer_conv_second)
 
+    # pooling
+    layer_conv_second = tf.layers.max_pooling1d(layer_conv_second,
+                                               pool_size=2,
+                                               strides=2,
+                                               padding='SAME')
+    
     # reshape the output so it can be feeded to the lstm (batch, time, input)
     number_of_lstm_inputs = layer_conv_second.get_shape().as_list()[1]
     layer_conv_flatten = tf.reshape(layer_conv_second, (-1, batch_size, number_of_lstm_inputs))
@@ -312,6 +324,15 @@ if __name__ == '__main__':
     ax1.plot(recovered_plot_y_hat, 'r', label='prediction')
     ax1.set_ylabel('RECONSTRUCTION: Prediction')
     plt.legend(loc='best')
+    
+    # highlights anomalies
+    for i in anomalies:
+        
+        if i <= len(y_test):
+            
+            plt.axvspan(i, i+1, color='yellow', alpha=0.5, lw=0)
+        
+    fig.tight_layout()
 
     fig.tight_layout()
     plt.show()
