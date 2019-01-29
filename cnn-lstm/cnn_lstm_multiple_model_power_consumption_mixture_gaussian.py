@@ -19,26 +19,26 @@ if __name__ == '__main__':
     # reset computational graph
     tf.reset_default_graph()
         
-    batch_size = 5
-    sequence_len = 35
-    stride = 10
-    learning_rate = 1e-2
+    batch_size = 10
+    sequence_len = 15
+    stride = 5
+    learning_rate = 2e-3
     epochs = 25
     sigma_threshold = 5.  # /tau
     n_mixtures = 1  # number of gaussian mixtures that appoximate the validation error
     
     # define first convolutional layer(s)
-    kernel_size_first = 2
-    number_of_filters_first = 35  # number of convolutions' filters for each LSTM cells
+    kernel_size_first = 3
+    number_of_filters_first = 20  # number of convolutions' filters for each LSTM cells
     stride_conv_first = 1
 
     # define second convolutional layer(s)
-    kernel_size_second = 2
-    number_of_filters_second = 20  # number of convolutions' filters for each LSTM cells
+    kernel_size_second = 3
+    number_of_filters_second = 35  # number of convolutions' filters for each LSTM cells
     stride_conv_second = 1
     
     # define lstm elements
-    number_of_lstm_units = 64  # number of hidden units in each lstm
+    number_of_lstm_units = 35  # number of hidden units in each lstm
     
     
     # define input/output pairs
@@ -65,11 +65,11 @@ if __name__ == '__main__':
     layer_conv_first = tf.add(layer_conv_first, bias_conv_first)
               
     # non-linear activation before lstm feeding                
-    layer_conv_first = tf.nn.relu(layer_conv_first)
+    layer_conv_first = tf.nn.tanh(layer_conv_first)
     
     # pooling
     layer_conv_first = tf.layers.max_pooling1d(layer_conv_first,
-                                               pool_size=2,
+                                               pool_size=3,
                                                strides=2,                                               
                                                padding='SAME')
     
@@ -94,20 +94,15 @@ if __name__ == '__main__':
     layer_conv_second = tf.add(layer_conv_second, bias_conv_second)
               
     # non-linear activation before lstm feeding                
-    layer_conv_second = tf.nn.relu(layer_conv_second)
-
-    # pooling
-    layer_conv_second = tf.layers.max_pooling1d(layer_conv_second,
-                                               pool_size=2,
-                                               strides=2,
-                                               padding='SAME')
+    layer_conv_second = tf.nn.tanh(layer_conv_second)
     
     # reshape the output so it can be feeded to the lstm (batch, time, input)
     number_of_lstm_inputs = layer_conv_second.get_shape().as_list()[1]
     layer_conv_flatten = tf.reshape(layer_conv_second, (-1, batch_size, number_of_lstm_inputs))
         
     # define the LSTM cells
-    cells = [tf.contrib.rnn.LSTMCell(number_of_lstm_units) for _ in range(2)]
+    cells = [tf.contrib.rnn.LSTMCell(number_of_lstm_units, 
+                                     activation=tf.nn.relu) for _ in range(2)]
     multi_rnn_cell = tf.nn.rnn_cell.MultiRNNCell(cells)    
     outputs, _ = tf.nn.dynamic_rnn(multi_rnn_cell, 
                                    layer_conv_flatten,
@@ -126,7 +121,7 @@ if __name__ == '__main__':
     
     # dense layer: prediction
     prediction = tf.tensordot(tf.reshape(outputs, shape=(batch_size, number_of_lstm_units)), weights_dense, 2) + bias_dense
-#    prediction = tf.nn.tanh(prediction)
+    prediction = tf.nn.relu(prediction)
     
 #    # exponential decay of the predictions
 #    decay = tf.constant(np.array([2**(-i) for i in range(batch_size)], dtype='float32')[::-1])
@@ -153,7 +148,7 @@ if __name__ == '__main__':
                                                              val_rel_percentage=.8,
                                                              normalize=True,
                                                              time_difference=True,
-                                                             td_method=np.log2)
+                                                             td_method=None)
     
     # suppress second axis on Y values (the algorithms expects shapes like (n,) for the prediction)
     y_train = y_train[:,0]; y_valid = y_valid[:,0]; y_test = y_test[:,0]
