@@ -101,8 +101,7 @@ if __name__ == '__main__':
     layer_conv_flatten = tf.reshape(layer_conv_second, (-1, batch_size, number_of_lstm_inputs))
         
     # define the LSTM cells
-    cells = [tf.contrib.rnn.LSTMCell(number_of_lstm_units, 
-                                     activation=tf.nn.relu) for _ in range(2)]
+    cells = [tf.contrib.rnn.LSTMCell(number_of_lstm_units) for _ in range(2)]
     multi_rnn_cell = tf.nn.rnn_cell.MultiRNNCell(cells)    
     outputs, _ = tf.nn.dynamic_rnn(multi_rnn_cell, 
                                    layer_conv_flatten,
@@ -121,7 +120,7 @@ if __name__ == '__main__':
     
     # dense layer: prediction
     prediction = tf.tensordot(tf.reshape(outputs, shape=(batch_size, number_of_lstm_units)), weights_dense, 2) + bias_dense
-    prediction = tf.nn.relu(prediction)
+#    prediction = tf.nn.relu(prediction)
     
 #    # exponential decay of the predictions
 #    decay = tf.constant(np.array([2**(-i) for i in range(batch_size)], dtype='float32')[::-1])
