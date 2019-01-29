@@ -141,7 +141,7 @@ if __name__ == '__main__':
                                                              val_rel_percentage=.8,
                                                              normalize=True,
                                                              time_difference=True,
-                                                             td_method=None)
+                                                             td_method=np.log2)
     
     # suppress second axis on Y values (the algorithms expects shapes like (n,) for the prediction)
     y_train = y_train[:,0]; y_valid = y_valid[:,0]; y_test = y_test[:,0]
