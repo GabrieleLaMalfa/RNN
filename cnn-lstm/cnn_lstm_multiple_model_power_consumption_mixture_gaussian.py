@@ -66,7 +66,7 @@ if __name__ == '__main__':
               
     # non-linear activation before lstm feeding                
     layer_conv_first = tf.nn.tanh(layer_conv_first)
-    
+     
     # pooling
     layer_conv_first = tf.layers.max_pooling1d(layer_conv_first,
                                                pool_size=3,
