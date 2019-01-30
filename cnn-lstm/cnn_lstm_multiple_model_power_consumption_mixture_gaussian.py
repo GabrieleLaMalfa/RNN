@@ -19,7 +19,7 @@ if __name__ == '__main__':
     # reset computational graph
     tf.reset_default_graph()
         
-    batch_size = 10
+    batch_size = 5
     sequence_len = 15
     stride = 5
     learning_rate = 2e-3
