@@ -31,7 +31,7 @@ def autocovariance_function(data, max_lag, plot=False):
     
     for i in range(max_lag):
         
-        autocovariance[i] = np.correlate(data[:ts_length-i]-mean_data, data[i:]-mean_data)
+        autocovariance[i] = np.sum((data[:ts_length-i]-mean_data)*(data[i:]-mean_data))
         autocovariance[i] /= (ts_length-1)
         
     autocovariance = autocovariance.flatten()
