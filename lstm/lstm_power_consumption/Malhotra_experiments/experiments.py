@@ -62,7 +62,7 @@ if __name__ == '__main__':
 
         # don't consider the last samples as anomalies since the logarithm as 
         #  time_difference method may 'corrupt' them (and there are NO anomalies there)
-        if tmp <= anomaly_threshold and i<len(test_errors)-15:
+        if tmp <= anomaly_threshold and i < len(test_errors)-15:
 
             print("\tPoint number ", i, " is an anomaly: P(x) is ", tmp)
             list_anomalies.append(i)
