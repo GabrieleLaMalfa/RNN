@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Jan  2 13:56:22 2019
+Created on Fri Feb  1 14:26:34 2019
 
 @author: Emanuele
 """
@@ -8,9 +8,11 @@ Created on Wed Jan  2 13:56:22 2019
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats as scistats
-from sklearn import mixture as mixture
+import sys
 import tensorflow as tf
 
+sys.path.append('../utils')
+import clustering as clst
 import utils_dataset as utils
 
 
@@ -21,11 +23,11 @@ if __name__ == '__main__':
         
     batch_size = 5
     sequence_len = 15
-    stride = 5
-    learning_rate = 2e-3
-    epochs = 25
-    sigma_threshold = 5.  # /tau
-    n_mixtures = 1  # number of gaussian mixtures that appoximate the validation error
+    stride = 3
+    learning_rate = 1e-3
+    epochs = 5
+    sigma_threshold = 5.5  # /tau
+    n_clusters = 8  # number of clusters for the k-means
     
     # define first convolutional layer(s)
     kernel_size_first = 3
@@ -38,11 +40,11 @@ if __name__ == '__main__':
     stride_conv_second = 1
     
     # define lstm elements
-    number_of_lstm_units = 35  # number of hidden units in each lstm
-    
+    number_of_lstm_units = 50  # number of hidden units in each lstm  
     
     # define input/output pairs
     input_ = tf.placeholder(tf.float32, [None, sequence_len, batch_size])  # (batch, input, time)
+    mem_cluster = tf.placeholder(tf.float32, [None, batch_size, 1])  # for each point, its cluster info
     target = tf.placeholder(tf.float32, [None, batch_size])  # (batch, output)
     
     # first cnn layer
@@ -66,12 +68,6 @@ if __name__ == '__main__':
               
     # non-linear activation before lstm feeding                
     layer_conv_first = tf.nn.tanh(layer_conv_first)
-     
-    # pooling
-    layer_conv_first = tf.layers.max_pooling1d(layer_conv_first,
-                                               pool_size=3,
-                                               strides=2,                                               
-                                               padding='SAME')
     
     #
     # second cnn layer
@@ -94,14 +90,17 @@ if __name__ == '__main__':
     layer_conv_second = tf.add(layer_conv_second, bias_conv_second)
               
     # non-linear activation before lstm feeding                
-    layer_conv_second = tf.nn.tanh(layer_conv_second)
+    layer_conv_second = tf.nn.tanh(layer_conv_second)    
     
     # reshape the output so it can be feeded to the lstm (batch, time, input)
     number_of_lstm_inputs = layer_conv_second.get_shape().as_list()[1]
     layer_conv_flatten = tf.reshape(layer_conv_second, (-1, batch_size, number_of_lstm_inputs))
+
+    # add the cluster's info to the lstm
+    layer_conv_flatten = tf.concat([mem_cluster, layer_conv_flatten], 2)
         
     # define the LSTM cells
-    cells = [tf.contrib.rnn.LSTMCell(number_of_lstm_units) for _ in range(2)]
+    cells = [tf.contrib.rnn.LSTMCell(number_of_lstm_units) for _ in range(1)]
     multi_rnn_cell = tf.nn.rnn_cell.MultiRNNCell(cells)    
     outputs, _ = tf.nn.dynamic_rnn(multi_rnn_cell, 
                                    layer_conv_flatten,
@@ -135,7 +134,21 @@ if __name__ == '__main__':
 #    loss = (200/batch_size)*tf.reduce_mean(tf.abs(target-prediction))/tf.reduce_mean(target+prediction)
     
     # optimization algorithm
-    optimizer = tf.train.AdamOptimizer(learning_rate).minimize(loss)        
+    optimizer = tf.train.AdamOptimizer(learning_rate).minimize(loss)
+    
+    # extract clusters information from clean data
+    x_train_tmp, y_train_tmp, x_test_tmp, y_test_tmp = utils.generate_batches(
+                                                             filename='data/power_consumption.csv', 
+                                                             window=sequence_len,
+                                                             stride=1,
+                                                             mode='train-test', 
+                                                             non_train_percentage=.3,
+                                                             val_rel_percentage=None,
+                                                             normalize=True,
+                                                             time_difference=True,
+                                                             td_method=None)
+    
+    clusters_info = clst.k_means(x_train_tmp, n_clusters)
     
     # extract train and test
     x_train, y_train, x_valid, y_valid, x_test, y_test = utils.generate_batches(
@@ -196,34 +209,41 @@ if __name__ == '__main__':
                 batch_x = x_train[iter_*batch_size: (iter_+1)*batch_size, :].T.reshape(1, sequence_len, batch_size)
                 batch_y = y_train[np.newaxis, iter_*batch_size: (iter_+1)*batch_size]
                 
+                # predict clusters memberships              
+                mem = clusters_info.predict(batch_x[0,:,:].T).reshape(-1, batch_size, 1) 
+                                
                 sess.run(optimizer, feed_dict={input_: batch_x,
-                                               target: batch_y})   
+                                               mem_cluster: mem,
+                                               target: batch_y})  
     
                 iter_ +=  1
 
         # validation
-        errors_valid = np.zeros(shape=(len(x_valid), batch_size))
+        errors_valid = list(list() for _ in range(n_clusters))
         iter_ = 0
         
         while iter_ < int(np.floor(x_valid.shape[0] / batch_size)):
     
             batch_x = x_valid[iter_*batch_size: (iter_+1)*batch_size, :].T.reshape(1, sequence_len, batch_size)
             batch_y = y_valid[np.newaxis, iter_*batch_size: (iter_+1)*batch_size]
+            
+            # predict clusters memberships              
+            mem = clusters_info.predict(batch_x[0,:,:].T).reshape(-1, batch_size, 1)
                 
-            errors_valid[iter_] = sess.run(prediction-batch_y, feed_dict={input_: batch_x,
-                                                                          target: batch_y})
+            error = sess.run(prediction-batch_y, feed_dict={input_: batch_x,
+                                                            mem_cluster: mem,
+                                                            target: batch_y})
+    
+            for l in range(batch_size):
+                
+                errors_valid[mem[0,l,0]].append(error[0,l])
 
             iter_ +=  1
         
-        # estimate mean and deviation of the errors' vector
-        #  since we have a batch size that may be different from 1 and we consider
-        #   the error of each last batch_y, we need to cut off the zero values
-        errors_valid = errors_valid[:iter_].flatten()
-        gaussian_mixture = mixture.GaussianMixture(n_components=n_mixtures)
-        gm = gaussian_mixture.fit(errors_valid.reshape(-1, 1))
-        means_valid = gm.means_[:,0]
-        stds_valid = gm.covariances_[:,0,0]**.5  # square it since it is the cov matrix
-        weights_valid = gm.weights_
+        # estimate mean and deviation of each errors' vector
+        errors_valid = np.array([np.asarray(e) for e in errors_valid], dtype=object)
+        means_valid = np.array([np.mean(e) for e in errors_valid])
+        stds_valid = np.array([np.std(e) for e in errors_valid])
                 
         # test
         predictions = np.zeros(shape=(int(np.floor(x_test.shape[0] / batch_size)), batch_size))
@@ -241,20 +261,21 @@ if __name__ == '__main__':
     
             batch_x = x_test[iter_*batch_size: (iter_+1)*batch_size, :].T.reshape(1, sequence_len, batch_size)
             batch_y = y_test[np.newaxis, iter_*batch_size: (iter_+1)*batch_size]
-                
+            
+            # predict clusters memberships              
+            mem = clusters_info.predict(batch_x[0,:,:].T).reshape(-1, batch_size, 1)
+            
             predictions[iter_] = sess.run(prediction, feed_dict={input_: batch_x,
+                                                                 mem_cluster: mem,
                                                                  target: batch_y}).flatten()
-    
-            errors_test[iter_] = batch_y - predictions[iter_]
-         
+                
+            errors_test[iter_] = batch_y-predictions[iter_]
+             
             for i in range(batch_size):
                 
-                # evaluate Pr(Z=1|X) for each gaussian distribution
-                num = np.array([w*scistats.norm.pdf(predictions[iter_, i]-batch_y[:,i], mean, std) for (mean, std, w) in zip(means_valid, stds_valid, weights_valid)])
-                den = np.sum(num)                
-                index = np.argmax(num/den)                
-                gaussian_error_statistics[iter_, i] = scistats.norm.pdf(predictions[iter_, i]-batch_y[:,i], means_valid[index], stds_valid[index])
-                anomalies[iter_, i] = (True if (gaussian_error_statistics[iter_, i] < threshold[index]) else False)
+                # evaluate Pr(Z=1|X) for each gaussian distribution              
+                gaussian_error_statistics[iter_, i] = scistats.norm.pdf(predictions[iter_, i]-batch_y[:,i], means_valid[mem[0,l,0]], stds_valid[mem[0,l,0]])
+                anomalies[iter_, i] = (True if (gaussian_error_statistics[iter_, i] < threshold[mem[0,l,0]]) else False)
             
             iter_ +=  1
                
