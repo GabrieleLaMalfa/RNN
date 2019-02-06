@@ -21,30 +21,31 @@ if __name__ == '__main__':
     # reset computational graph
     tf.reset_default_graph()
         
-    batch_size = 5
-    sequence_len = 15
+    batch_size = 15
+    sequence_len = 8
     stride = 3
-    learning_rate = 1e-3
-    epochs = 5
-    sigma_threshold = 5.5  # /tau
-    n_clusters = 8  # number of clusters for the k-means
+    learning_rate = 5e-3
+    epochs = 25
+    sigma_threshold = 5.  # /tau
+    n_clusters = 4  # number of clusters for the k-means
+    n_clusters_td = 2  # number of clusters for the k-means (td data)
     
     # define first convolutional layer(s)
     kernel_size_first = 3
-    number_of_filters_first = 20  # number of convolutions' filters for each LSTM cells
+    number_of_filters_first = 10  # number of convolutions' filters for each LSTM cells
     stride_conv_first = 1
 
     # define second convolutional layer(s)
-    kernel_size_second = 3
-    number_of_filters_second = 35  # number of convolutions' filters for each LSTM cells
-    stride_conv_second = 1
+    kernel_size_second = 2
+    number_of_filters_second = 15  # number of convolutions' filters for each LSTM cells
+    stride_conv_second = 2
     
     # define lstm elements
     number_of_lstm_units = 50  # number of hidden units in each lstm  
     
     # define input/output pairs
     input_ = tf.placeholder(tf.float32, [None, sequence_len, batch_size])  # (batch, input, time)
-    mem_cluster = tf.placeholder(tf.float32, [None, batch_size, 1])  # for each point, its cluster info
+    mem_cluster = tf.placeholder(tf.float32, [None, batch_size, 2])  # for each point, its cluster info
     target = tf.placeholder(tf.float32, [None, batch_size])  # (batch, output)
     
     # first cnn layer
@@ -122,7 +123,7 @@ if __name__ == '__main__':
 #    prediction = tf.nn.relu(prediction)
     
 #    # exponential decay of the predictions
-#    decay = tf.constant(np.array([2**(-i) for i in range(batch_size)], dtype='float32')[::-1])
+#    decay = tf.constant(np.array([2**(-i) for i in range(batch_size+2)], dtype='float32'))
 #    prediction = prediction*decay
 
     # loss evaluation
@@ -137,18 +138,19 @@ if __name__ == '__main__':
     optimizer = tf.train.AdamOptimizer(learning_rate).minimize(loss)
     
     # extract clusters information from clean data
-    x_train_tmp, y_train_tmp, x_test_tmp, y_test_tmp = utils.generate_batches(
-                                                             filename='data/power_consumption.csv', 
-                                                             window=sequence_len,
-                                                             stride=1,
-                                                             mode='train-test', 
-                                                             non_train_percentage=.3,
-                                                             val_rel_percentage=None,
-                                                             normalize=True,
-                                                             time_difference=True,
-                                                             td_method=None)
+    x_train_tmp, y_train_tmp, x_valid_tmp, y_valid_tmp, x_test_tmp, y_test_tmp = utils.generate_batches(
+                                                                                     filename='data/power_consumption.csv', 
+                                                                                     window=sequence_len,
+                                                                                     stride=stride,
+                                                                                     mode='validation', 
+                                                                                     non_train_percentage=.3,
+                                                                                     val_rel_percentage=.8,                                                                                     
+                                                                                     normalize=True,
+                                                                                     time_difference=False,
+                                                                                     td_method=None)
     
-    clusters_info = clst.k_means(x_train_tmp, n_clusters)
+    # cluster info relative to signal's value (cluster's means)
+    clusters_info = clst.k_means(x_train_tmp, n_clusters)    
     
     # extract train and test
     x_train, y_train, x_valid, y_valid, x_test, y_test = utils.generate_batches(
@@ -161,6 +163,9 @@ if __name__ == '__main__':
                                                              normalize=True,
                                                              time_difference=True,
                                                              td_method=np.log2)
+    
+    # cluster info relative to time difference (cluster's means)
+    clusters_info_td = clst.k_means(x_train, n_clusters_td)
     
     # suppress second axis on Y values (the algorithms expects shapes like (n,) for the prediction)
     y_train = y_train[:,0]; y_valid = y_valid[:,0]; y_test = y_test[:,0]
@@ -210,7 +215,12 @@ if __name__ == '__main__':
                 batch_y = y_train[np.newaxis, iter_*batch_size: (iter_+1)*batch_size]
                 
                 # predict clusters memberships              
-                mem = clusters_info.predict(batch_x[0,:,:].T).reshape(-1, batch_size, 1) 
+                cluster_batch_x =  x_train_tmp[iter_*batch_size: (iter_+1)*batch_size, :].T.reshape(1, sequence_len, batch_size)           
+                cluster_batch_x_td = x_train[iter_*batch_size: (iter_+1)*batch_size, :].T.reshape(1, sequence_len, batch_size)
+                mem = clusters_info.predict(cluster_batch_x[0,:,:].T).reshape(-1, batch_size, 1)
+                mem_td = clusters_info_td.predict(cluster_batch_x_td[0,:,:].T).reshape(-1, batch_size, 1)
+                mem = np.concatenate((clusters_info.cluster_centers_.sum(axis=1)[mem], 
+                                      clusters_info_td.cluster_centers_.sum(axis=1)[mem_td]), axis=2)
                                 
                 sess.run(optimizer, feed_dict={input_: batch_x,
                                                mem_cluster: mem,
@@ -218,8 +228,8 @@ if __name__ == '__main__':
     
                 iter_ +=  1
 
-        # validation
-        errors_valid = list(list() for _ in range(n_clusters))
+        # validation: we use the td clusters
+        errors_valid = list(list() for _ in range(n_clusters_td))
         iter_ = 0
         
         while iter_ < int(np.floor(x_valid.shape[0] / batch_size)):
@@ -228,15 +238,21 @@ if __name__ == '__main__':
             batch_y = y_valid[np.newaxis, iter_*batch_size: (iter_+1)*batch_size]
             
             # predict clusters memberships              
-            mem = clusters_info.predict(batch_x[0,:,:].T).reshape(-1, batch_size, 1)
-                
+            cluster_batch_x =  x_valid_tmp[iter_*batch_size: (iter_+1)*batch_size, :].T.reshape(1, sequence_len, batch_size)           
+            cluster_batch_x_td = x_valid[iter_*batch_size: (iter_+1)*batch_size, :].T.reshape(1, sequence_len, batch_size)
+            mem_value = clusters_info.predict(cluster_batch_x[0,:,:].T).reshape(-1, batch_size, 1)
+            mem_value_td = clusters_info_td.predict(cluster_batch_x_td[0,:,:].T).reshape(-1, batch_size, 1)
+            mem = np.concatenate((clusters_info.cluster_centers_.sum(axis=1)[mem_value], 
+                                  clusters_info_td.cluster_centers_.sum(axis=1)[mem_value_td]), axis=2)             
+            mem_indices = np.concatenate((mem_value, mem_value_td), axis=2)
+            
             error = sess.run(prediction-batch_y, feed_dict={input_: batch_x,
                                                             mem_cluster: mem,
                                                             target: batch_y})
     
             for l in range(batch_size):
                 
-                errors_valid[mem[0,l,0]].append(error[0,l])
+                errors_valid[mem_value_td[0,l,0]].append(error[0,l])
 
             iter_ +=  1
         
@@ -263,7 +279,13 @@ if __name__ == '__main__':
             batch_y = y_test[np.newaxis, iter_*batch_size: (iter_+1)*batch_size]
             
             # predict clusters memberships              
-            mem = clusters_info.predict(batch_x[0,:,:].T).reshape(-1, batch_size, 1)
+            cluster_batch_x =  x_test_tmp[iter_*batch_size: (iter_+1)*batch_size, :].T.reshape(1, sequence_len, batch_size)           
+            cluster_batch_x_td = x_test[iter_*batch_size: (iter_+1)*batch_size, :].T.reshape(1, sequence_len, batch_size)
+            mem_value = clusters_info.predict(cluster_batch_x[0,:,:].T).reshape(-1, batch_size, 1)
+            mem_value_td = clusters_info_td.predict(cluster_batch_x_td[0,:,:].T).reshape(-1, batch_size, 1)
+            mem = np.concatenate((clusters_info.cluster_centers_.sum(axis=1)[mem_value], 
+                                  clusters_info_td.cluster_centers_.sum(axis=1)[mem_value_td]), axis=2)
+            mem_indices = np.concatenate((mem_value, mem_value_td), axis=2)
             
             predictions[iter_] = sess.run(prediction, feed_dict={input_: batch_x,
                                                                  mem_cluster: mem,
@@ -274,8 +296,8 @@ if __name__ == '__main__':
             for i in range(batch_size):
                 
                 # evaluate Pr(Z=1|X) for each gaussian distribution              
-                gaussian_error_statistics[iter_, i] = scistats.norm.pdf(predictions[iter_, i]-batch_y[:,i], means_valid[mem[0,l,0]], stds_valid[mem[0,l,0]])
-                anomalies[iter_, i] = (True if (gaussian_error_statistics[iter_, i] < threshold[mem[0,l,0]]) else False)
+                gaussian_error_statistics[iter_, i] = scistats.norm.pdf(predictions[iter_, i]-batch_y[:,i], means_valid[mem_value_td[0,l,0]], stds_valid[mem_value_td[0,l,0]])
+                anomalies[iter_, i] = (True if (gaussian_error_statistics[iter_, i] < threshold[mem_value_td[0,l,0]]) else False)
             
             iter_ +=  1
                
