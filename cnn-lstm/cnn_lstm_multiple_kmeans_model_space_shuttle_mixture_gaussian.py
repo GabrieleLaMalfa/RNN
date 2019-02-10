@@ -24,7 +24,7 @@ if __name__ == '__main__':
     batch_size = 15
     sequence_len = 8
     stride = 3
-    learning_rate = 5e-3
+    learning_rate = 1e-2
     epochs = 25
     sigma_threshold = 5.  # /tau
     n_clusters = 4  # number of clusters for the k-means
@@ -145,7 +145,7 @@ if __name__ == '__main__':
                                                                                      mode='validation', 
                                                                                      non_train_percentage=.5,
                                                                                      val_rel_percentage=.5,                                                                                     
-                                                                                     normalize=True,
+                                                                                     normalize='maxmin01',
                                                                                      time_difference=False,
                                                                                      td_method=None)
     
@@ -160,7 +160,7 @@ if __name__ == '__main__':
                                                              mode='validation', 
                                                              non_train_percentage=.5,
                                                              val_rel_percentage=.5,
-                                                             normalize=True,
+                                                             normalize='maxmin01',
                                                              time_difference=True,
                                                              td_method=np.log2)
     

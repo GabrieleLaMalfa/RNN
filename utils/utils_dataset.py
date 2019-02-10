@@ -101,12 +101,28 @@ def series_to_matrix(series, k_shape, striding=1):
 
 
 """
- 3 split-techinques are possible and need do be specified in 'mode' variable:
-    'train': all data is reserved to train;
-    'train-test': split between train and test, according to non_train_percentage;
-    'validation': data is split among train, test and validation: their percentage is chosen according to the percantge
-                  of data that has not been included in train (1-non_train_percentage) and assigned to validation
-                  proportionally to val_rel_percentage.
+ Generate batches from a .cvs file.
+ Takes as input:
+     filename:string, path to the .csv file where data is stored;
+     window:int, size of each sample (i.e. a sample at time t is generated as y(t:t+window));
+     stride:int, number of timesteps skipped after the generation of each sample;
+     mode:string, available split techniques:
+        'train': all data is reserved to train;
+        'train-test': split between train and test, according to non_train_percentage;
+        'validation': data is split among train, test and validation: their percentage is chosen according to the percantge
+                      of data that has not been included in train (1-non_train_percentage) and assigned to validation
+                      proportionally to val_rel_percentage.;
+     non_train_percentage:float, given the entire dataset, the percentage of data not used for train;
+     val_rel_percentage:float, percentage (relative to non_train_percentage) of dataset used for validation.
+         This variable is considered if and only if mode is 'validation';
+     normalize:string, available normalization techniques:
+         'maxmin01': normalize in the range [0,1];
+         'maxmin-11': normalize in the range [-1,1].;
+     time-difference:boolean, specify whether time difference techniques are used;
+     td_method:function, specify which function is used to perform time-difference on data.
+          This variable is considered if and only if time_difference is True.
+ Returns:
+     dataset:numpy.array, the data ready to be used.
 """
 def generate_batches(filename, 
                      window,
@@ -114,7 +130,7 @@ def generate_batches(filename,
                      mode='train-test', 
                      non_train_percentage=.7, 
                      val_rel_percentage=.5,
-                     normalize=False,
+                     normalize='maxmin01',
                      time_difference=False,
                      td_method=None):
 
@@ -122,9 +138,18 @@ def generate_batches(filename,
     data = (data.iloc[:, 0]).values
 
     # normalize dataset (max-min method)
-    if normalize is True:
+    if normalize is 'maxmin01':
         
         data = (data-np.min(data))/(np.max(data)-np.min(data))
+    
+    elif normalize == 'maxmin-11':
+    
+        avg = (np.max(data)-np.min(data))/2
+        data = (data-avg)/avg
+    
+    else:
+        
+        print("Dataset is not normalized.")
                 
     # if the flag 'time-difference' is enabled, turn the dataset into the variation of each time 
     #  step with the previous value (loose the firt sample)

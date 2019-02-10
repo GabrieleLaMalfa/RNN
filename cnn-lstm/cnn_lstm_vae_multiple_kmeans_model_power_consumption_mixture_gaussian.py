@@ -21,27 +21,47 @@ if __name__ == '__main__':
     # reset computational graph
     tf.reset_default_graph()
         
-    batch_size = 15
-    sequence_len = 8
-    stride = 3
-    learning_rate = 5e-3
+    batch_size = 5
+    sequence_len = 10
+    stride = 5
+    learning_rate = 1e-3
     epochs = 25
-    sigma_threshold = 5.  # /tau
+    sigma_threshold = 4.  # /tau
     n_clusters = 4  # number of clusters for the k-means
     n_clusters_td = 2  # number of clusters for the k-means (td data)
     
     # define first convolutional layer(s)
     kernel_size_first = 3
-    number_of_filters_first = 10  # number of convolutions' filters for each LSTM cells
-    stride_conv_first = 1
+    number_of_filters_first = 15  # number of convolutions' filters for each LSTM cells
+    stride_conv_first = 2
 
     # define second convolutional layer(s)
     kernel_size_second = 2
     number_of_filters_second = 15  # number of convolutions' filters for each LSTM cells
     stride_conv_second = 2
     
-    # define lstm elements
-    number_of_lstm_units = 50  # number of hidden units in each lstm  
+    # define lstm parameters
+    number_of_lstm_units = 35  # number of hidden units in each lstm  
+    
+    # define VAE parameters
+    learning_rate_elbo = 1e-5
+#    sigma_threshold_elbo = 2.5  # threshold for the VAE gaussian
+    vae_hidden_size = 5
+    threshold_elbo = 5e-3
+    
+    vae_encoder_shape_weights = [batch_size*sequence_len, vae_hidden_size*2]
+    vae_decoder_shape_weights = [vae_hidden_size, batch_size*sequence_len]
+
+    zip_weights_encoder = zip(vae_encoder_shape_weights[:-1], vae_encoder_shape_weights[1:])
+    weights_vae_encoder = [tf.Variable(tf.truncated_normal(shape=[shape,
+                                                                  next_shape])) for (shape, next_shape) in zip_weights_encoder]
+    bias_vae_encoder = [tf.Variable(tf.truncated_normal(shape=[shape])) for shape in vae_encoder_shape_weights[1:]]
+    
+    zip_weights_decoder = zip(vae_decoder_shape_weights[:-1], vae_decoder_shape_weights[1:])
+    weights_vae_decoder = [tf.Variable(tf.truncated_normal(shape=[shape,
+                                                                  next_shape])) for (shape, next_shape) in zip_weights_decoder]
+    bias_vae_decoder = [tf.Variable(tf.truncated_normal(shape=[shape])) for shape in vae_decoder_shape_weights[1:]]
+    
     
     # define input/output pairs
     input_ = tf.placeholder(tf.float32, [None, sequence_len, batch_size])  # (batch, input, time)
@@ -120,23 +140,72 @@ if __name__ == '__main__':
     
     # dense layer: prediction
     prediction = tf.tensordot(tf.reshape(outputs, shape=(batch_size, number_of_lstm_units)), weights_dense, 2) + bias_dense
-#    prediction = tf.nn.relu(prediction)
-    
-#    # exponential decay of the predictions
-#    decay = tf.constant(np.array([2**(-i) for i in range(batch_size+2)], dtype='float32'))
-#    prediction = prediction*decay
 
     # loss evaluation
-    # calculate loss (L2, MSE, huber, hinge, sMAPE: leave uncommented one of them)
     loss = tf.nn.l2_loss(target-prediction)
-#    loss = tf.losses.mean_squared_error(target, prediction)
-#    loss = tf.losses.huber_loss(target, prediction, delta=.25)
-#    loss = tf.losses.hinge_loss(target, prediction)
-#    loss = (200/batch_size)*tf.reduce_mean(tf.abs(target-prediction))/tf.reduce_mean(target+prediction)
     
     # optimization algorithm
     optimizer = tf.train.AdamOptimizer(learning_rate).minimize(loss)
     
+    # VAE parameters' initialization
+    vae_encoder_shape_weights = [batch_size*sequence_len, vae_hidden_size*2]
+    vae_decoder_shape_weights = [vae_hidden_size, batch_size*sequence_len]
+    
+    zip_weights_encoder = zip(vae_encoder_shape_weights[:-1], vae_encoder_shape_weights[1:])
+    
+    weights_vae_encoder = [tf.Variable(tf.truncated_normal(shape=[shape,
+                                                                  next_shape])) for (shape, next_shape) in zip_weights_encoder]
+    bias_vae_encoder = [tf.Variable(tf.truncated_normal(shape=[shape])) for shape in vae_encoder_shape_weights[1:]]
+    
+    zip_weights_decoder = zip(vae_decoder_shape_weights[:-1], vae_decoder_shape_weights[1:])
+    weights_vae_decoder = [tf.Variable(tf.truncated_normal(shape=[shape,
+                                                                  next_shape])) for (shape, next_shape) in zip_weights_decoder]
+    bias_vae_decoder = [tf.Variable(tf.truncated_normal(shape=[shape])) for shape in vae_decoder_shape_weights[1:]]
+    
+    #
+    # VAE graph's definition
+    flattened_input = tf.layers.flatten(input_)
+    
+    vae_encoder = tf.matmul(flattened_input, weights_vae_encoder[0]) + bias_vae_encoder[0]
+    
+    for (w_vae, b_vae) in zip(weights_vae_encoder[1:], bias_vae_encoder[1:]):
+        
+        vae_encoder = tf.nn.relu(vae_encoder)
+        vae_encoder = tf.matmul(vae_encoder, w_vae) + b_vae
+    
+    # means and variances' vectors of the learnt hidden distribution
+    #  we assume the hidden gaussian's variances matrix is diagonal
+    loc = tf.slice(tf.nn.relu(vae_encoder), [0, 0], [-1, vae_hidden_size])
+    loc = tf.squeeze(loc, axis=0)
+    scale = tf.slice(tf.nn.softplus(vae_encoder), [0, vae_hidden_size], [-1, vae_hidden_size])
+    scale = tf.squeeze(scale, 0)
+    
+    vae_hidden_distr = tf.contrib.distributions.MultivariateNormalDiag(loc, scale)    
+    vae_hidden_state = vae_hidden_distr.sample()
+    
+    feed_decoder = tf.reshape(vae_hidden_state, shape=(-1, vae_hidden_size))
+    vae_decoder = tf.matmul(feed_decoder, weights_vae_decoder[0]) + bias_vae_decoder[0]
+    vae_decoder = tf.nn.relu(vae_decoder)    
+    
+    for (w_vae, b_vae) in zip(weights_vae_decoder[1:], bias_vae_decoder[1:]):
+        
+        vae_decoder = tf.matmul(vae_decoder, w_vae) + b_vae
+        vae_decoder = tf.nn.relu(vae_decoder)
+    
+    # time-series reconstruction and ELBO loss
+    vae_reconstruction = tf.contrib.distributions.MultivariateNormalDiag(tf.constant(np.zeros(batch_size*sequence_len, dtype='float32')),
+                                                                         tf.constant(np.ones(batch_size*sequence_len, dtype='float32')))
+    likelihood = vae_reconstruction.log_prob(flattened_input)
+    
+    prior = tf.contrib.distributions.MultivariateNormalDiag(tf.constant(np.zeros(vae_hidden_size, dtype='float32')),
+                                                            tf.constant(np.ones(vae_hidden_size, dtype='float32')))
+    
+    divergence = tf.contrib.distributions.kl_divergence(vae_hidden_distr, prior)
+    elbo = tf.reduce_mean(likelihood - divergence)
+    
+    optimizer_elbo = tf.train.AdamOptimizer(learning_rate_elbo).minimize(elbo)       
+    
+    #
     # extract clusters information from clean data
     x_train_tmp, y_train_tmp, x_valid_tmp, y_valid_tmp, x_test_tmp, y_test_tmp = utils.generate_batches(
                                                                                      filename='data/power_consumption.csv', 
@@ -224,8 +293,11 @@ if __name__ == '__main__':
                                 
                 sess.run(optimizer, feed_dict={input_: batch_x,
                                                mem_cluster: mem,
-                                               target: batch_y})  
-    
+                                               target: batch_y})
+        
+                # run VAE encoding-decoding
+                sess.run(optimizer_elbo, feed_dict={input_: batch_x})
+
                 iter_ +=  1
 
         # validation: we use the td clusters
@@ -271,6 +343,12 @@ if __name__ == '__main__':
         threshold = [scistats.norm.pdf(mean-sigma_threshold*std, mean, std) for (mean, std) in zip(means_valid, stds_valid)]
         anomalies = np.array([np.array([False for _ in range(batch_size)]) for _ in range(len(y_test))])
         
+        # elbo threshold
+        mean_elbo = np.zeros(shape=vae_hidden_size)
+        std_elbo = np.eye(vae_hidden_size)
+#        threshold_elbo = scistats.multivariate_normal.pdf(mean_elbo-sigma_threshold_elbo, mean_elbo, std_elbo)
+        vae_anomalies = np.zeros(shape=(len(predictions)))
+        
         iter_ = 0
         
         while iter_ < int(np.floor(x_test.shape[0] / batch_size)):
@@ -292,12 +370,20 @@ if __name__ == '__main__':
                                                                  target: batch_y}).flatten()
                 
             errors_test[iter_] = batch_y-predictions[iter_]
-             
-            for i in range(batch_size):
-                
-                # evaluate Pr(Z=1|X) for each gaussian distribution              
-                gaussian_error_statistics[iter_, i] = scistats.norm.pdf(predictions[iter_, i]-batch_y[:,i], means_valid[mem_value_td[0,l,0]], stds_valid[mem_value_td[0,l,0]])
-                anomalies[iter_, i] = (True if (gaussian_error_statistics[iter_, i] < threshold[mem_value_td[0,l,0]]) else False)
+            
+            # test if the VAE encoding is anomalous for the sample
+            test_hidden_state = sess.run(vae_hidden_state, feed_dict={input_: batch_x})
+            vae_anomalies[iter_] =  scistats.multivariate_normal.pdf(test_hidden_state, 
+                                                                     np.zeros(shape=vae_hidden_size), 
+                                                                     np.eye(vae_hidden_size))
+                        
+            if vae_anomalies[iter_] < threshold_elbo:
+                   
+                for i in range(batch_size):
+                    
+                    # evaluate Pr(Z=1|X) for each gaussian distribution              
+                    gaussian_error_statistics[iter_, i] = scistats.norm.pdf(predictions[iter_, i]-batch_y[:,i], means_valid[mem_value_td[0,l,0]], stds_valid[mem_value_td[0,l,0]])                
+                    anomalies[iter_, i] = (True if (gaussian_error_statistics[iter_, i] < threshold[mem_value_td[0,l,0]]) else False)
             
             iter_ +=  1
                
@@ -370,7 +456,18 @@ if __name__ == '__main__':
             plt.axvspan(i, i+1, color='yellow', alpha=0.5, lw=0)
         
     fig.tight_layout()
-
+    plt.show()
+    
+    # plot vae likelihood values
+    fig, ax1 = plt.subplots()
+    ax1.plot(vae_anomalies, 'b', label='time')
+    ax1.set_ylabel('VAE: Anomalies likelihood')
+    plt.legend(loc='best')
+    
+    # highlights elbo's boundary
+    ax1.plot(np.array([threshold_elbo for _ in range(len(vae_anomalies))]), 'r', label='prediction')
+    plt.legend(loc='best')
+        
     fig.tight_layout()
     plt.show()
     

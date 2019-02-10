@@ -115,7 +115,7 @@ if __name__ == '__main__':
                                                              mode='validation', 
                                                              non_train_percentage=.3,
                                                              val_rel_percentage=.8,
-                                                             normalize=True,
+                                                             normalize='maxmin01',
                                                              time_difference=True,
                                                              td_method=np.log2)
     

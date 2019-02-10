@@ -116,7 +116,7 @@ if __name__ == '__main__':
                                                              mode='validation', 
                                                              non_train_percentage=.5,
                                                              val_rel_percentage=.5,
-                                                             normalize=True,
+                                                             normalize='maxmin01',
                                                              time_difference=True,
                                                              td_method=None)
     
