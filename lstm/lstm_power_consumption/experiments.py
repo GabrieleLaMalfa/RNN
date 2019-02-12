@@ -8,13 +8,15 @@ Created on Sat Nov 24 15:27:05 2018
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats as scistats
+import sys as sys
 
-import anomaly_detection as LSTM_exp
+sys.path.append('../../utils')
+import utils_dataset as LSTM_exp
 
 
 if __name__ == '__main__':
 
-    DATA_PATH = 'power_consumption.csv'
+    DATA_PATH = '../../data/power_consumption.csv'
     num_units = 64
     window = 8
     stride = 3
@@ -23,7 +25,7 @@ if __name__ == '__main__':
     non_train_percentage = 0.3
     training_epochs = 5
     val_rel_percentage = .8
-    normalize = True
+    normalize = 'maxmin01'
     time_difference = True
     td_method = np.log2
 
@@ -82,11 +84,6 @@ if __name__ == '__main__':
     ax1.plot(plot_y_hat, 'r', label='prediction')
     ax1.set_ylabel('Prediction')
     plt.legend(loc='best')
-
-#    # plot anomaly's likelihood
-#    ax1.stem(range(len(test_errors)), test_errors, markerfmt=' ')
-#    ax1.set_ylabel("Anomaly's Likelihood")
-#    plt.legend(loc='best')
 
     for i in list_anomalies:
 

@@ -2,30 +2,31 @@
 """
 Created on Sat Nov 24 15:27:05 2018
 
-@author: Gabriele
+@author: Emanuele
 """
 
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats as scistats
+import sys as sys
 
-import anomaly_detection as LSTM_exp
+sys.path.append('../../../utils')
+import utils_dataset as LSTM_exp
 
 
 if __name__ == '__main__':
 
-    # model parameters
-    DATA_PATH = 'naive_dataset.csv'
-    num_units = 35
-    window = 5
-    stride = 1
-    batch_size = 3
-    l_rate = 1e-2 
-    non_train_percentage = 0.5 
+    DATA_PATH = '../../../data/space_shuttle_marotta_valve.csv'
+    num_units = 20
+    window = 8
+    stride = 2
+    batch_size = 15
+    l_rate = 1e-1
+    non_train_percentage = 0.5
     training_epochs = 10
     val_rel_percentage = .5
     normalize = True
-    time_difference = True
+    time_difference = False
     td_method = None
 
     results = LSTM_exp.lstm_exp(filename=DATA_PATH, 
@@ -48,7 +49,7 @@ if __name__ == '__main__':
     std = np.std(val_errors)
     
     # Anomaly detection
-    sigma_threshold = 3.  # /tau
+    sigma_threshold = 5.  # /tau
     anomaly_threshold = scistats.norm.pdf(mean-sigma_threshold*std, mean, std)
 
     # turn test errors into a numpy array
@@ -61,9 +62,11 @@ if __name__ == '__main__':
 
         tmp = scistats.norm.pdf(test_errors[i], mean, std)
 
-        if tmp <= anomaly_threshold:
+        # don't consider the last samples as anomalies since the logarithm as 
+        #  time_difference method may 'corrupt' them (and there are NO anomalies there)
+        if tmp <= anomaly_threshold and i < len(test_errors)-15:
 
-            print("\tPoint number ", i, " is an anomaly: pdf is ", tmp)
+            print("\tPoint number ", i, " is an anomaly: P(x) is ", tmp)
             list_anomalies.append(i)
 
     # plot results
@@ -81,11 +84,6 @@ if __name__ == '__main__':
     ax1.plot(plot_y_hat, 'r', label='prediction')
     ax1.set_ylabel('Prediction')
     plt.legend(loc='best')
-
-#    # plot anomaly's likelihood
-#    ax1.stem(range(len(test_errors)), test_errors, markerfmt=' ')
-#    ax1.set_ylabel("Anomaly's Likelihood")
-#    plt.legend(loc='best')
 
     for i in list_anomalies:
 
@@ -124,7 +122,7 @@ if __name__ == '__main__':
 
     fig.tight_layout()
     plt.show()
-
+    
     # errors on test
     print("\nTest errors:")
     plt.hist(np.array(results['Test_Errors']).ravel(), bins=30) 
@@ -134,7 +132,7 @@ if __name__ == '__main__':
     
     # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
     # train 50%, validation_relative 50%
-    target_anomalies[1044:1047] = target_anomalies[1145:1147] = 1
+    target_anomalies[520:540] = 1
     
     # real values
     condition_positive = np.argwhere(target_anomalies == 1)
@@ -146,18 +144,17 @@ if __name__ == '__main__':
                                       predicted_positive,
                                       assume_unique=True)
     
-    # precision: fraction of true anomalies among the anomalies raised by the model
+    # precision
     precision = len(np.intersect1d(condition_positive, predicted_positive))/len(predicted_positive)
     
-    # fall-out: probability of raising a 'false alarm'
+    # fall-out
     fall_out = len(np.intersect1d(predicted_positive, condition_negative))/len(condition_negative)
     
-    # recall: probability of detection of an anomaly
+    # recall
     recall = len(np.intersect1d(condition_positive, predicted_positive))/len(condition_positive)
     
     print("Anomalies: ", condition_positive.T)
     print("Anomalies Detected: ", predicted_positive.T)
     print("Precision: ", precision)
     print("Fallout: ", fall_out)
-    print("Recall: ", recall)  
-    
+    print("Recall: ", recall)    

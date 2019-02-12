@@ -139,7 +139,7 @@ if __name__ == '__main__':
     
     # extract clusters information from clean data
     x_train_tmp, y_train_tmp, x_valid_tmp, y_valid_tmp, x_test_tmp, y_test_tmp = utils.generate_batches(
-                                                                                     filename='data/power_consumption.csv', 
+                                                                                     filename='../data/power_consumption.csv', 
                                                                                      window=sequence_len,
                                                                                      stride=stride,
                                                                                      mode='validation', 
@@ -154,7 +154,7 @@ if __name__ == '__main__':
     
     # extract train and test
     x_train, y_train, x_valid, y_valid, x_test, y_test = utils.generate_batches(
-                                                             filename='data/power_consumption.csv', 
+                                                             filename='../data/power_consumption.csv', 
                                                              window=sequence_len,
                                                              stride=stride,
                                                              mode='validation', 

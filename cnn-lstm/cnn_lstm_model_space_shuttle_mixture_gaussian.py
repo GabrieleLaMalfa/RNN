@@ -10,7 +10,9 @@ import numpy as np
 import scipy.stats as scistats
 from sklearn import mixture as mixture
 import tensorflow as tf
+import sys as sys
 
+sys.path.append('../utils')
 import utils_dataset as utils
 
 
@@ -19,10 +21,10 @@ if __name__ == '__main__':
     # reset computational graph
     tf.reset_default_graph()
         
-    batch_size = 10
-    sequence_len = 15
-    stride = 2
-    learning_rate = 2e-3
+    batch_size = 8
+    sequence_len = 10
+    stride = 5
+    learning_rate = 1e-2
     epochs = 10
     
     # define convolutional layer(s)
@@ -31,9 +33,9 @@ if __name__ == '__main__':
     stride_conv = 1
     
     # define lstm elements
-    number_of_lstm_units = 50  # number of hidden units in each lstm
+    number_of_lstm_units = 35  # number of hidden units in each lstm
     
-    prediction_threshold = 5.75
+    prediction_threshold = 6.
     n_mixtures = 1  
     
     # define input/output pairs
@@ -91,26 +93,16 @@ if __name__ == '__main__':
     
     # dense layer: prediction
     prediction = tf.tensordot(tf.reshape(outputs, shape=(batch_size, number_of_lstm_units)), weights_dense, 2) + bias_dense
-#    prediction = tf.nn.tanh(prediction)
     
-#    # exponential decay of the predictions
-#    decay = tf.constant(np.array([2**(-i) for i in range(batch_size)], dtype='float32')[::-1])
-#    prediction = prediction*decay
-
     # loss evaluation
-    # calculate loss (L2, MSE, huber, hinge, sMAPE: leave uncommented one of them)
     loss = tf.nn.l2_loss(target-prediction)
-#    loss = tf.losses.mean_squared_error(target, prediction)
-#    loss = tf.losses.huber_loss(target, prediction, delta=.25)
-#    loss = tf.losses.hinge_loss(target, prediction)
-#    loss = (200/batch_size)*tf.reduce_mean(tf.abs(target-prediction))/tf.reduce_mean(target+prediction)
     
     # optimization algorithm
     optimizer = tf.train.AdamOptimizer(learning_rate).minimize(loss)        
     
     # extract train and test
     x_train, y_train, x_valid, y_valid, x_test, y_test = utils.generate_batches(
-                                                             filename='data/space_shuttle_marotta_valve.csv', 
+                                                             filename='../data/space_shuttle_marotta_valve.csv', 
                                                              window=sequence_len,
                                                              stride=stride,
                                                              mode='validation', 
@@ -298,7 +290,7 @@ if __name__ == '__main__':
     
     # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
     # train 50%, validation_relative 50%
-    target_anomalies[520:540] = target_anomalies[630:640] = 1
+    target_anomalies[520:540] = 1
     
     # real values
     condition_positive = np.argwhere(target_anomalies == 1)

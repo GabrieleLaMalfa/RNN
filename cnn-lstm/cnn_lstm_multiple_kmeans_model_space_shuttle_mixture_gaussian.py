@@ -139,7 +139,7 @@ if __name__ == '__main__':
     
     # extract clusters information from clean data
     x_train_tmp, y_train_tmp, x_valid_tmp, y_valid_tmp, x_test_tmp, y_test_tmp = utils.generate_batches(
-                                                                                     filename='data/space_shuttle_marotta_valve.csv', 
+                                                                                     filename='../data/space_shuttle_marotta_valve.csv', 
                                                                                      window=sequence_len,
                                                                                      stride=stride,
                                                                                      mode='validation', 
@@ -154,7 +154,7 @@ if __name__ == '__main__':
     
     # extract train and test
     x_train, y_train, x_valid, y_valid, x_test, y_test = utils.generate_batches(
-                                                             filename='data/space_shuttle_marotta_valve.csv', 
+                                                             filename='../data/space_shuttle_marotta_valve.csv', 
                                                              window=sequence_len,
                                                              stride=stride,
                                                              mode='validation', 
@@ -383,7 +383,7 @@ if __name__ == '__main__':
     
     # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
     # train 50%, validation_relative 50%
-    target_anomalies[520:540] = target_anomalies[630:640] = 1
+    target_anomalies[520:540] = 1
     
     # real values
     condition_positive = np.argwhere(target_anomalies == 1)

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Fri Feb  1 14:26:34 2019
+Created on Mon Feb 11 19:20:04 2019
 
 @author: Emanuele
 """
@@ -21,36 +21,31 @@ if __name__ == '__main__':
     # reset computational graph
     tf.reset_default_graph()
         
-    batch_size = 8
-    sequence_len = 8
-    stride = 5
-    learning_rate = 1e-3
-    epochs = 10
+    batch_size = 10
+    sequence_len = 6
+    stride = 2
+    learning_rate = 1e-4
+    epochs = 25
     sigma_threshold = 4.  # /tau
     n_clusters = 4  # number of clusters for the k-means
     n_clusters_td = 2  # number of clusters for the k-means (td data)
     
     # define first convolutional layer(s)
     kernel_size_first = 3
-    number_of_filters_first = 15  # number of convolutions' filters for each LSTM cells
+    number_of_filters_first = 35  # number of convolutions' filters for each LSTM cells
     stride_conv_first = 2
-
-    # define second convolutional layer(s)
-    kernel_size_second = 2
-    number_of_filters_second = 15  # number of convolutions' filters for each LSTM cells
-    stride_conv_second = 1
     
     # define lstm parameters
-    number_of_lstm_units = 35  # number of hidden units in each lstm  
+    number_of_lstm_units = 50  # number of hidden units in each lstm  
     
     # define VAE parameters
     learning_rate_elbo = 1e-5
 #    sigma_threshold_elbo = 2.5  # threshold for the VAE gaussian
-    vae_hidden_size = 5
-    threshold_elbo = 5e-3
+    vae_hidden_size = 2
+    sigma_threshold_elbo = 2.25
     
-    vae_encoder_shape_weights = [batch_size*sequence_len, vae_hidden_size*2]
-    vae_decoder_shape_weights = [vae_hidden_size, batch_size*sequence_len]
+    vae_encoder_shape_weights = [batch_size*sequence_len, 35, vae_hidden_size*2]
+    vae_decoder_shape_weights = [vae_hidden_size, 25, batch_size*sequence_len]
 
     zip_weights_encoder = zip(vae_encoder_shape_weights[:-1], vae_encoder_shape_weights[1:])
     weights_vae_encoder = [tf.Variable(tf.truncated_normal(shape=[shape,
@@ -88,34 +83,11 @@ if __name__ == '__main__':
     layer_conv_first = tf.add(layer_conv_first, bias_conv_first)
               
     # non-linear activation before lstm feeding                
-    layer_conv_first = tf.nn.tanh(layer_conv_first)
-    
-    #
-    # second cnn layer
-    weights_conv_second = [tf.Variable(tf.truncated_normal(shape=[kernel_size_second,
-                                                           number_of_filters_second,
-                                                           1])) for _ in range(batch_size)]
-    
-    bias_conv_second = tf.Variable(tf.zeros(shape=[batch_size]))
-    
-    # stack one input for each battery of filters
-    input_stacked = tf.stack([layer_conv_first]*number_of_filters_second, axis=3)
-       
-    layer_conv_second = [tf.nn.conv1d(input_stacked[:,:,i,:],
-                               filters=weights_conv_second[i], 
-                               stride=stride_conv_second, 
-                               padding='SAME') for i in range(batch_size)]
-    
-    # squeeze and stack the input of the lstm
-    layer_conv_second = tf.squeeze(tf.stack([l for l in layer_conv_second], axis=-2), axis=-1)
-    layer_conv_second = tf.add(layer_conv_second, bias_conv_second)
-              
-    # non-linear activation before lstm feeding                
-    layer_conv_second = tf.nn.tanh(layer_conv_second)    
+    layer_conv_first = tf.nn.leaky_relu(layer_conv_first)   
     
     # reshape the output so it can be feeded to the lstm (batch, time, input)
-    number_of_lstm_inputs = layer_conv_second.get_shape().as_list()[1]
-    layer_conv_flatten = tf.reshape(layer_conv_second, (-1, batch_size, number_of_lstm_inputs))
+    number_of_lstm_inputs = layer_conv_first.get_shape().as_list()[1]
+    layer_conv_flatten = tf.reshape(layer_conv_first, (-1, batch_size, number_of_lstm_inputs))
 
     # add the cluster's info to the lstm
     layer_conv_flatten = tf.concat([mem_cluster, layer_conv_flatten], 2)
@@ -208,12 +180,12 @@ if __name__ == '__main__':
     #
     # extract clusters information from clean data
     x_train_tmp, y_train_tmp, x_valid_tmp, y_valid_tmp, x_test_tmp, y_test_tmp = utils.generate_batches(
-                                                                                     filename='../data/power_consumption.csv', 
+                                                                                     filename='../data/space_shuttle_marotta_valve.csv', 
                                                                                      window=sequence_len,
                                                                                      stride=stride,
                                                                                      mode='validation', 
-                                                                                     non_train_percentage=.3,
-                                                                                     val_rel_percentage=.8,                                                                                     
+                                                                                     non_train_percentage=.5,
+                                                                                     val_rel_percentage=.5,                                                                                     
                                                                                      normalize='maxmin01',
                                                                                      time_difference=False,
                                                                                      td_method=None)
@@ -223,12 +195,12 @@ if __name__ == '__main__':
     
     # extract train and test
     x_train, y_train, x_valid, y_valid, x_test, y_test = utils.generate_batches(
-                                                             filename='../data/power_consumption.csv', 
+                                                             filename='../data/space_shuttle_marotta_valve.csv', 
                                                              window=sequence_len,
                                                              stride=stride,
                                                              mode='validation', 
-                                                             non_train_percentage=.3,
-                                                             val_rel_percentage=.8,
+                                                             non_train_percentage=.5,
+                                                             val_rel_percentage=.5,
                                                              normalize='maxmin01',
                                                              time_difference=True,
                                                              td_method=np.log2)
@@ -296,7 +268,7 @@ if __name__ == '__main__':
                                                target: batch_y})
         
                 # run VAE encoding-decoding
-                sess.run(optimizer_elbo, feed_dict={input_: batch_x})
+                sess.run(optimizer_elbo, feed_dict={input_: cluster_batch_x})
 
                 iter_ +=  1
 
@@ -346,7 +318,7 @@ if __name__ == '__main__':
         # elbo threshold
         mean_elbo = np.zeros(shape=vae_hidden_size)
         std_elbo = np.eye(vae_hidden_size)
-#        threshold_elbo = scistats.multivariate_normal.pdf(mean_elbo-sigma_threshold_elbo, mean_elbo, std_elbo)
+        threshold_elbo = scistats.multivariate_normal.pdf(mean_elbo-sigma_threshold_elbo, mean_elbo, std_elbo)
         vae_anomalies = np.zeros(shape=(len(predictions)))
         
         iter_ = 0
@@ -372,7 +344,7 @@ if __name__ == '__main__':
             errors_test[iter_] = batch_y-predictions[iter_]
             
             # test if the VAE encoding is anomalous for the sample
-            test_hidden_state = sess.run(vae_hidden_state, feed_dict={input_: batch_x})
+            test_hidden_state = sess.run(vae_hidden_state, feed_dict={input_: cluster_batch_x})
             vae_anomalies[iter_] =  scistats.multivariate_normal.pdf(test_hidden_state, 
                                                                      np.zeros(shape=vae_hidden_size), 
                                                                      np.eye(vae_hidden_size))
@@ -479,8 +451,8 @@ if __name__ == '__main__':
     target_anomalies = np.zeros(shape=int(np.floor(x_test.shape[0] / batch_size))*batch_size)
     
     # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
-    # train 70%, validation_relative 80%
-    target_anomalies[1400:1600] = 1
+    # train 50%, validation_relative 50%
+    target_anomalies[520:540] = 1
     
     # real values
     condition_positive = np.argwhere(target_anomalies == 1)

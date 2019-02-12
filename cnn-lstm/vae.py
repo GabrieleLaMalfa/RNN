@@ -21,9 +21,9 @@ if __name__ == '__main__':
     tf.reset_default_graph()
         
     # data parameters
-    batch_size = 5
+    batch_size = 10
     sequence_len = 15
-    stride = 5
+    stride = 2
     
     # training epochs
     epochs = 25
@@ -31,15 +31,15 @@ if __name__ == '__main__':
     # define VAE parameters
     learning_rate_elbo = 1e-5
     vae_hidden_size = 5
-    threshold_elbo = 5e-3
+    sigma_threshold_elbo = 4.
     
     # define input/output pairs
     input_ = tf.placeholder(tf.float32, [None, sequence_len, batch_size])  # (batch, input, time)
     target = tf.placeholder(tf.float32, [None, batch_size])  # (batch, output)
     
     # parameters' initialization
-    vae_encoder_shape_weights = [batch_size*sequence_len, vae_hidden_size*2]
-    vae_decoder_shape_weights = [vae_hidden_size, batch_size*sequence_len]
+    vae_encoder_shape_weights = [batch_size*sequence_len, 35, vae_hidden_size*2]
+    vae_decoder_shape_weights = [vae_hidden_size, 25, batch_size*sequence_len]
     
     zip_weights_encoder = zip(vae_encoder_shape_weights[:-1], vae_encoder_shape_weights[1:])
     
@@ -97,15 +97,15 @@ if __name__ == '__main__':
 
     # extract train and test
     x_train, y_train, x_valid, y_valid, x_test, y_test = utils.generate_batches(
-                                                             filename='data/power_consumption.csv', 
+                                                             filename='../data/space_shuttle_marotta_valve.csv', 
                                                              window=sequence_len,
                                                              stride=stride,
                                                              mode='validation', 
-                                                             non_train_percentage=.3,
-                                                             val_rel_percentage=.8,
-                                                             normalize='maxmin01',
-                                                             time_difference=True,
-                                                             td_method=np.log2)
+                                                             non_train_percentage=.5,
+                                                             val_rel_percentage=.5,
+                                                             normalize='maxmin-11',
+                                                             time_difference=False,
+                                                             td_method=None)
        
     # suppress second axis on Y values (the algorithms expects shapes like (n,) for the prediction)
     y_train = y_train[:,0]; y_valid = y_valid[:,0]; y_test = y_test[:,0]
@@ -165,7 +165,7 @@ if __name__ == '__main__':
         std_elbo = np.eye(vae_hidden_size)
         vae_anomalies = np.zeros(shape=(int(np.floor(x_test.shape[0] / batch_size))))
         
-#        threshold_elbo = scistats.multivariate_normal.pdf(mean_elbo-sigma_threshold_elbo, mean_elbo, std_elbo)
+        threshold_elbo = scistats.multivariate_normal.pdf(mean_elbo-sigma_threshold_elbo, mean_elbo, std_elbo)
 
         
         iter_ = 0
@@ -185,12 +185,12 @@ if __name__ == '__main__':
             
     # plot vae likelihood values
     fig, ax1 = plt.subplots()
-    ax1.plot(vae_anomalies, 'b', label='time')
+    ax1.plot(vae_anomalies, 'b', label='likelihood')
     ax1.set_ylabel('VAE: Anomalies likelihood')
     plt.legend(loc='best')
     
     # highlights elbo's boundary
-    ax1.plot(np.array([threshold_elbo for _ in range(len(vae_anomalies))]), 'r', label='prediction')
+    ax1.plot(np.array([threshold_elbo for _ in range(len(vae_anomalies))]), 'r', label='threshold')
     plt.legend(loc='best')
         
     fig.tight_layout()

@@ -108,7 +108,7 @@ if __name__ == '__main__':
     
     # extract train and test
     x_train, y_train, x_valid, y_valid, x_test, y_test = utils.generate_batches(
-                                                             filename='data/naive_dataset.csv', 
+                                                             filename='../data/naive_dataset.csv', 
                                                              window=sequence_len,
                                                              stride=stride,
                                                              mode='validation', 

@@ -8,19 +8,21 @@ Created on Sat Nov 24 15:27:05 2018
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats as scistats
+import sys as sys
 
-import anomaly_detection as LSTM_exp
+sys.path.append('../../utils')
+import utils_dataset as LSTM_exp
 
 
 if __name__ == '__main__':
 
-    DATA_PATH = 'space_shuttle_marotta_valve.csv'
-    num_units = 75
+    DATA_PATH = '../../data/space_shuttle_marotta_valve.csv'
+    num_units = 20
     window = 8
-    stride = 3
-    batch_size = 10
+    stride = 8
+    batch_size = 15
     l_rate = 1e-2
-    non_train_percentage = 0.5 
+    non_train_percentage = 0.5
     training_epochs = 10
     val_rel_percentage = .5
     normalize = True
@@ -47,7 +49,7 @@ if __name__ == '__main__':
     std = np.std(val_errors)
     
     # Anomaly detection
-    sigma_threshold = 6.  # /tau
+    sigma_threshold = 5.  # /tau
     anomaly_threshold = scistats.norm.pdf(mean-sigma_threshold*std, mean, std)
 
     # turn test errors into a numpy array
@@ -60,7 +62,9 @@ if __name__ == '__main__':
 
         tmp = scistats.norm.pdf(test_errors[i], mean, std)
 
-        if tmp <= anomaly_threshold:
+        # don't consider the last samples as anomalies since the logarithm as 
+        #  time_difference method may 'corrupt' them (and there are NO anomalies there)
+        if tmp <= anomaly_threshold and i<len(test_errors)-15:
 
             print("\tPoint number ", i, " is an anomaly: P(x) is ", tmp)
             list_anomalies.append(i)
@@ -80,11 +84,6 @@ if __name__ == '__main__':
     ax1.plot(plot_y_hat, 'r', label='prediction')
     ax1.set_ylabel('Prediction')
     plt.legend(loc='best')
-
-#    # plot anomaly's likelihood
-#    ax1.stem(range(len(test_errors)), test_errors, markerfmt=' ')
-#    ax1.set_ylabel("Anomaly's Likelihood")
-#    plt.legend(loc='best')
 
     for i in list_anomalies:
 
@@ -133,7 +132,7 @@ if __name__ == '__main__':
     
     # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
     # train 50%, validation_relative 50%
-    target_anomalies[520:540] = target_anomalies[630:640] = 1
+    target_anomalies[520:540] = 1
     
     # real values
     condition_positive = np.argwhere(target_anomalies == 1)

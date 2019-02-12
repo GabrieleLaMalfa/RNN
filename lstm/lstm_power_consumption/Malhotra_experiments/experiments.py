@@ -8,15 +8,17 @@ Created on Sat Nov 24 15:27:05 2018
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats as scistats
+import sys as sys
 
-import anomaly_detection as LSTM_exp
+sys.path.append('../../../utils')
+import utils_dataset as LSTM_exp
 
 
 if __name__ == '__main__':
 
-    DATA_PATH = '../power_consumption.csv'
+    DATA_PATH = '../../../data/power_consumption.csv'
     num_units = 35
-    window = 3
+    window = 8
     stride = 2
     batch_size = 5
     l_rate = 1e-2
