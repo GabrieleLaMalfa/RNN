@@ -7,11 +7,13 @@ Created on Fri Feb  1 14:26:34 2019
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import scipy.stats as scistats
 import sys
 import tensorflow as tf
 
 sys.path.append('../utils')
+import best_fit_distribution as bfd
 import clustering as clst
 import utils_dataset as utils
 
@@ -505,4 +507,10 @@ if __name__ == '__main__':
     print("Anomalies Detected: ", predicted_positive.T)
     print("Precision: ", precision)
     print("Fallout: ", fall_out)
-    print("Recall: ", recall)                               
+    print("Recall: ", recall)          
+
+    # top-n distributions that fit the test errors.
+    top_n = 3
+    cols = [col for col in bfd.best_fit_distribution(np.array(errors_test).ravel())]
+    top_n_distr = pd.DataFrame(cols, columns=['NAME', 'PARAMS', 'ERRORS'])
+    print("\n\nTop distributions: NAME ERRORS PARAM ", top_n_distr)                      

@@ -7,11 +7,13 @@ Created on Sat Nov 24 15:27:05 2018
 
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 import scipy.stats as scistats
 import sys as sys
 
 sys.path.append('../../../utils')
 import utils_dataset as LSTM_exp
+import best_fit_distribution as bfd
 
 
 if __name__ == '__main__':
@@ -162,4 +164,10 @@ if __name__ == '__main__':
     print("Anomalies Detected: ", predicted_positive.T)
     print("Precision: ", precision)
     print("Fallout: ", fall_out)
-    print("Recall: ", recall)    
+    print("Recall: ", recall)   
+    
+    # top-n distributions that fit the test errors.
+    top_n = 3
+    cols = [col for col in bfd.best_fit_distribution(np.array(results['Test_Errors']).ravel())]
+    top_n_distr = pd.DataFrame(cols, columns=['NAME', 'PARAMS', 'ERRORS'])
+    print("\n\nTop distributions: NAME ERRORS PARAM ", top_n_distr) 

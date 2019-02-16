@@ -7,11 +7,15 @@ Created on Wed Jan  2 13:56:22 2019
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import scipy.stats as scistats
 from sklearn import mixture as mixture
 import tensorflow as tf
+import sys as sys
 
+sys.path.append('../utils')
 import utils_dataset as utils
+import best_fit_distribution as bfd
 
 
 if __name__ == '__main__':
@@ -89,19 +93,10 @@ if __name__ == '__main__':
     
     # dense layer: prediction
     prediction = tf.tensordot(tf.reshape(outputs, shape=(batch_size, number_of_lstm_units)), weights_dense, 2) + bias_dense
-    
-#    # (optional) exponential decay of the predictions
-#    decay = tf.constant(np.array([2**(-i) for i in range(batch_size)], dtype='float32')[::-1])
-#    prediction_with_decay = prediction*decay
-    prediction_with_decay = prediction
 
     # loss evaluation
     # calculate loss (L2, MSE, huber, hinge, sMAPE: leave uncommented one of them)
-    loss = tf.nn.l2_loss(target-prediction_with_decay)
-#    loss = tf.losses.mean_squared_error(target, prediction_with_decay)
-#    loss = tf.losses.huber_loss(target, prediction_with_decay, delta=.25)
-#    loss = tf.losses.hinge_loss(target, prediction_with_decay)
-#    loss = (200/batch_size)*tf.reduce_mean(tf.abs(target-prediction_with_decay))/tf.reduce_mean(target+prediction_with_decay)
+    loss = tf.nn.l2_loss(target-prediction)
     
     # optimization algorithm
     optimizer = tf.train.AdamOptimizer(learning_rate).minimize(loss)        
@@ -322,4 +317,10 @@ if __name__ == '__main__':
     print("Anomalies Detected: ", predicted_positive.T)
     print("Precision: ", precision)
     print("Fallout: ", fall_out)
-    print("Recall: ", recall)                
+    print("Recall: ", recall)    
+
+    # top-n distributions that fit the test errors.
+    top_n = 3
+    cols = [col for col in bfd.best_fit_distribution(np.array(errors_test).ravel())]
+    top_n_distr = pd.DataFrame(cols, columns=['NAME', 'PARAMS', 'ERRORS'])
+    print("\n\nTop distributions: NAME ERRORS PARAM ", top_n_distr)             

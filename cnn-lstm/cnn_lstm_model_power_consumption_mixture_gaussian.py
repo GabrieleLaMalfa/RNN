@@ -7,11 +7,15 @@ Created on Wed Jan  2 13:56:22 2019
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import scipy.stats as scistats
 from sklearn import mixture as mixture
 import tensorflow as tf
+import sys as sys
 
+sys.path.append('../utils')
 import utils_dataset as utils
+import best_fit_distribution as bfd
 
 
 if __name__ == '__main__':
@@ -20,8 +24,8 @@ if __name__ == '__main__':
     tf.reset_default_graph()
         
     batch_size = 10
-    sequence_len = 15
-    stride = 4
+    sequence_len = 5
+    stride = 3
     learning_rate = 1e-2
     epochs = 5
     sigma_threshold = 3.85  # /tau
@@ -327,4 +331,10 @@ if __name__ == '__main__':
     print("Anomalies Detected: ", predicted_positive.T)
     print("Precision: ", precision)
     print("Fallout: ", fall_out)
-    print("Recall: ", recall)                               
+    print("Recall: ", recall)    
+
+    # top-n distributions that fit the test errors.
+    top_n = 3
+    cols = [col for col in bfd.best_fit_distribution(np.array(errors_test).ravel())]
+    top_n_distr = pd.DataFrame(cols, columns=['NAME', 'PARAMS', 'ERRORS'])
+    print("\n\nTop distributions: NAME ERRORS PARAM ", top_n_distr)                            
