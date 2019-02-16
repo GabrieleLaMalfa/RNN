@@ -484,5 +484,5 @@ if __name__ == '__main__':
     # top-n distributions that fit the test errors.
     top_n = 3
     cols = [col for col in bfd.best_fit_distribution(np.array(errors_test).ravel())]
-    top_n_distr = pd.DataFrame(cols, columns=['NAME', 'PARAMS', 'ERRORS'])
+    top_n_distr = pd.DataFrame(cols, index=['NAME', 'PARAMS', 'ERRORS'])
     print("\n\nTop distributions: NAME ERRORS PARAM ", top_n_distr)                               

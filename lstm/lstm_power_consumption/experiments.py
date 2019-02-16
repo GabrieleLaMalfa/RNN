@@ -22,14 +22,14 @@ if __name__ == '__main__':
     num_units = 64
     window = 8
     stride = 3
-    batch_size = 10
-    l_rate = 5e-3
+    batch_size = 8
+    l_rate = 1e-1
     non_train_percentage = 0.3
     training_epochs = 5
     val_rel_percentage = .8
     normalize = 'maxmin01'
     time_difference = True
-    td_method = np.log2
+    td_method = None
 
     results = LSTM_exp.lstm_exp(filename=DATA_PATH, 
                                 num_units=num_units, 
@@ -162,7 +162,7 @@ if __name__ == '__main__':
     print("Recall: ", recall) 
 
     # top-n distributions that fit the test errors.
-    top_n = 3
-    cols = [col for col in bfd.best_fit_distribution(np.array(errors_test).ravel())]
-    top_n_distr = pd.DataFrame(cols, columns=['NAME', 'PARAMS', 'ERRORS'])
+    top_n = 10
+    cols = [col for col in bfd.best_fit_distribution(np.array(results['Test_Errors']).ravel(), top_n=top_n)]
+    top_n_distr = pd.DataFrame(cols, index=['NAME', 'PARAMS', 'ERRORS'])
     print("\n\nTop distributions: NAME ERRORS PARAM ", top_n_distr) 

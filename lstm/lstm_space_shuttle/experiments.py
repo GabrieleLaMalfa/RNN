@@ -19,15 +19,15 @@ import best_fit_distribution as bfd
 if __name__ == '__main__':
 
     DATA_PATH = '../../data/space_shuttle_marotta_valve.csv'
-    num_units = 20
+    num_units = 35
     window = 8
     stride = 5
-    batch_size = 10
-    l_rate = 1e-2
+    batch_size = 8
+    l_rate = 1e-1
     non_train_percentage = 0.5
     training_epochs = 10
     val_rel_percentage = .5
-    normalize = True
+    normalize = 'maxmin01'
     time_difference = True
     td_method = None
 
@@ -162,7 +162,7 @@ if __name__ == '__main__':
     print("Recall: ", recall)   
     
     # top-n distributions that fit the test errors.
-    top_n = 3
-    cols = [col for col in bfd.best_fit_distribution(np.array(results['Test_Errors']).ravel())]
-    top_n_distr = pd.DataFrame(cols, columns=['NAME', 'PARAMS', 'ERRORS'])
+    top_n = 10
+    cols = [col for col in bfd.best_fit_distribution(np.array(results['Test_Errors']).ravel(), top_n=top_n)]
+    top_n_distr = pd.DataFrame(cols, index=['NAME', 'PARAMS', 'ERRORS'])
     print("\n\nTop distributions: NAME ERRORS PARAM ", top_n_distr)   

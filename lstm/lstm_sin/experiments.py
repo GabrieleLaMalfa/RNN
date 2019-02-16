@@ -11,25 +11,25 @@ import pandas as pd
 import scipy.stats as scistats
 import sys as sys
 
-sys.path.append('../../../utils')
+sys.path.append('../../utils')
 import utils_dataset as LSTM_exp
 import best_fit_distribution as bfd
 
 
 if __name__ == '__main__':
 
-    DATA_PATH = '../../../data/power_consumption.csv'
-    num_units = 35
-    window = 8
-    stride = 2
+    DATA_PATH = '../../data/sin.csv'
+    num_units = 20
+    window = 7
+    stride = 3
     batch_size = 5
-    l_rate = 1e-2
-    non_train_percentage = 0.3
+    l_rate = 1e-1
+    non_train_percentage = .5
     training_epochs = 10
-    val_rel_percentage = .8
-    normalize = 'maxmin01'
-    time_difference = True
-    td_method = np.log2
+    val_rel_percentage = .5
+    normalize = 'maxmin-11'
+    time_difference = False
+    td_method = None
 
     results = LSTM_exp.lstm_exp(filename=DATA_PATH, 
                                 num_units=num_units, 
@@ -51,7 +51,7 @@ if __name__ == '__main__':
     std = np.std(val_errors)
     
     # Anomaly detection
-    sigma_threshold = 4.5  # /tau
+    sigma_threshold = 5.  # /tau
     anomaly_threshold = scistats.norm.pdf(mean-sigma_threshold*std, mean, std)
 
     # turn test errors into a numpy array
@@ -66,7 +66,7 @@ if __name__ == '__main__':
 
         # don't consider the last samples as anomalies since the logarithm as 
         #  time_difference method may 'corrupt' them (and there are NO anomalies there)
-        if tmp <= anomaly_threshold and i < len(test_errors)-15:
+        if tmp <= anomaly_threshold and i<len(test_errors)-15:
 
             print("\tPoint number ", i, " is an anomaly: P(x) is ", tmp)
             list_anomalies.append(i)
@@ -86,11 +86,6 @@ if __name__ == '__main__':
     ax1.plot(plot_y_hat, 'r', label='prediction')
     ax1.set_ylabel('Prediction')
     plt.legend(loc='best')
-
-#    # plot anomaly's likelihood
-#    ax1.stem(range(len(test_errors)), test_errors, markerfmt=' ')
-#    ax1.set_ylabel("Anomaly's Likelihood")
-#    plt.legend(loc='best')
 
     for i in list_anomalies:
 
@@ -138,8 +133,9 @@ if __name__ == '__main__':
     target_anomalies = np.zeros(shape=int(np.floor(plot_y.shape[0] / batch_size))*batch_size)
     
     # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
-    # train 70%, validation_relative 80%
-    target_anomalies[1400:1600] = 1
+    # train 50%, validation_relative 50%
+    target_anomalies[860:909] = target_anomalies[1111:1140] = 1
+    target_anomalies[1561:1599] = target_anomalies[1906:1945] = 1
     
     # real values
     condition_positive = np.argwhere(target_anomalies == 1)
@@ -167,7 +163,7 @@ if __name__ == '__main__':
     print("Recall: ", recall)   
     
     # top-n distributions that fit the test errors.
-    top_n = 3
+    top_n = 10
     cols = [col for col in bfd.best_fit_distribution(np.array(results['Test_Errors']).ravel(), top_n=top_n)]
     top_n_distr = pd.DataFrame(cols, index=['NAME', 'PARAMS', 'ERRORS'])
-    print("\n\nTop distributions: NAME ERRORS PARAM ", top_n_distr) 
+    print("\n\nTop distributions: NAME ERRORS PARAM ", top_n_distr)   
