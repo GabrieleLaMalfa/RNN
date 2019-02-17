@@ -160,7 +160,7 @@ if __name__ == '__main__':
     print("Anomalies Detected: ", predicted_positive.T)
     print("Precision: ", precision)
     print("Fallout: ", fall_out)
-    print("Recall: ", recall)   
+    print("Recall: ", recall)  
     
     # top-n distributions that fit the test errors.
     top_n = 10

@@ -177,9 +177,9 @@ if __name__ == '__main__':
     # save sMAPE of each model
     sMAPE_error_len = len(np.array(results['Test_Errors']).ravel())
     sMAPE_den = np.abs(np.array(results['Y_HAT']).ravel()[:sMAPE_error_len])+np.abs(np.array(results['Y_test']).ravel()[:sMAPE_error_len])
-    perc_error = np.mean((200*np.abs(np.array(results['Test_Errors']).ravel()[:sMAPE_error_len]))/sMAPE_den)
+    perc_error = np.mean(200*(np.abs(np.array(results['Test_Errors']).ravel()[:sMAPE_error_len]))/sMAPE_den)
     print("Percentage error: ", perc_error)
     
     file_ptr = np.loadtxt('../../__tmp/__tmp_err.csv', dtype=object)
     file_ptr = np.append(file_ptr, str(perc_error))
-    np.savetxt('../../__tmp/__tmp_err.csv', file_ptr, fmt='%s') 
+    np.savetxt('../../__tmp/__tmp_err.csv', file_ptr, fmt='%s')

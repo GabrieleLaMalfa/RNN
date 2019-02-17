@@ -23,19 +23,19 @@ if __name__ == '__main__':
     # reset computational graph
     tf.reset_default_graph()
         
-    batch_size = 3
-    sequence_len = 5
-    stride = 1
+    batch_size = 1
+    sequence_len = 10
+    stride = 2
     learning_rate = 1e-3
     epochs = 10
     
     # define convolutional layer(s)
     kernel_size = 3
     number_of_filters = 10  # number of convolutions' filters for each LSTM cells
-    stride_conv = 1
+    stride_conv = 2
     
     # define lstm elements
-    number_of_lstm_units = 35  # number of hidden units in each lstm
+    number_of_lstm_units = 10  # number of hidden units in each lstm
     
     
     # define input/output pairs
@@ -61,7 +61,7 @@ if __name__ == '__main__':
     layer_conv = tf.add(layer_conv, bias_conv)
               
     # non-linear activation before lstm feeding                
-    layer_conv = tf.nn.leaky_relu(layer_conv)    
+    layer_conv = tf.nn.tanh(layer_conv)    
 
     # reshape the output so it can be feeded to the lstm (batch, time, input)
     number_of_lstm_inputs = layer_conv.get_shape().as_list()[1]
@@ -108,7 +108,7 @@ if __name__ == '__main__':
                                                              mode='validation', 
                                                              non_train_percentage=.5,
                                                              val_rel_percentage=.5,
-                                                             normalize='maxmin01',
+                                                             normalize='maxmin-11',
                                                              time_difference=True,
                                                              td_method=None)
     
