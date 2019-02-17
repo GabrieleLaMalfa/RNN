@@ -19,11 +19,11 @@ import best_fit_distribution as bfd
 if __name__ == '__main__':
 
     DATA_PATH = '../../data/power_consumption.csv'
-    num_units = 64
+    num_units = 50
     window = 8
     stride = 3
     batch_size = 8
-    l_rate = 1e-1
+    l_rate = 1e-2
     non_train_percentage = 0.3
     training_epochs = 5
     val_rel_percentage = .8
@@ -51,7 +51,7 @@ if __name__ == '__main__':
     std = np.std(val_errors)
     
     # Anomaly detection
-    sigma_threshold = 5.  # /tau
+    sigma_threshold = 1.  # /tau
     anomaly_threshold = scistats.norm.pdf(mean-sigma_threshold*std, mean, std)
 
     # turn test errors into a numpy array
@@ -165,4 +165,22 @@ if __name__ == '__main__':
     top_n = 10
     cols = [col for col in bfd.best_fit_distribution(np.array(results['Test_Errors']).ravel(), top_n=top_n)]
     top_n_distr = pd.DataFrame(cols, index=['NAME', 'PARAMS', 'ERRORS'])
-    print("\n\nTop distributions: NAME ERRORS PARAM ", top_n_distr) 
+    print("\n\nTop distributions: NAME ERRORS PARAM ", top_n_distr)
+    
+    file_ptr = np.loadtxt('../../__tmp/__tmp_res.csv', dtype=object)
+    for i in range(top_n):
+        
+        file_ptr = np.append(file_ptr, top_n_distr[i]['NAME'])
+    
+    np.savetxt('../../__tmp/__tmp_res.csv', file_ptr, fmt='%s')
+    
+    # save sMAPE of each model
+    sMAPE_error_len = len(np.array(results['Test_Errors']).ravel())
+    sMAPE_den = np.abs(np.array(results['Y_HAT']).ravel()[:sMAPE_error_len])+np.abs(np.array(results['Y_test']).ravel()[:sMAPE_error_len])
+    perc_error = np.mean((200*np.abs(np.array(results['Test_Errors']).ravel()[:sMAPE_error_len]))/sMAPE_den)
+    print("Percentage error: ", perc_error)
+    
+    file_ptr = np.loadtxt('../../__tmp/__tmp_err.csv', dtype=object)
+    file_ptr = np.append(file_ptr, str(perc_error))
+    np.savetxt('../../__tmp/__tmp_err.csv', file_ptr, fmt='%s') 
+    

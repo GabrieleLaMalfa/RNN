@@ -413,7 +413,24 @@ if __name__ == '__main__':
     print("Recall: ", recall)
 
     # top-n distributions that fit the test errors.
-    top_n = 3
-    cols = [col for col in bfd.best_fit_distribution(np.array(errors_test).ravel())]
+    top_n = 10
+    cols = [col for col in bfd.best_fit_distribution(np.array(errors_test).ravel(), top_n=top_n)]
     top_n_distr = pd.DataFrame(cols, index=['NAME', 'PARAMS', 'ERRORS'])
-    print("\n\nTop distributions: NAME ERRORS PARAM ", top_n_distr)                                
+    print("\n\nTop distributions: NAME ERRORS PARAM ", top_n_distr)
+    
+    file_ptr = np.loadtxt('../__tmp/__tmp_res.csv', dtype=object)
+    for i in range(top_n):
+        
+        file_ptr = np.append(file_ptr, top_n_distr[i]['NAME'])
+    
+    np.savetxt('../__tmp/__tmp_res.csv', file_ptr, fmt='%s')
+    
+    # save sMAPE of each model
+    sMAPE_error_len = len(np.array(errors_test).ravel())
+    sMAPE_den = np.abs(np.array(predictions).ravel()[:sMAPE_error_len])+np.abs(np.array(y_test).ravel()[:sMAPE_error_len])
+    perc_error = np.mean(200*(np.abs(np.array(errors_test).ravel()[:sMAPE_error_len]))/sMAPE_den)
+    print("Percentage error: ", perc_error)
+    
+    file_ptr = np.loadtxt('../__tmp/__tmp_err.csv', dtype=object)
+    file_ptr = np.append(file_ptr, str(perc_error))
+    np.savetxt('../__tmp/__tmp_err.csv', file_ptr, fmt='%s')                                 

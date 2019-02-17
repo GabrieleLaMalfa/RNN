@@ -19,17 +19,17 @@ import best_fit_distribution as bfd
 if __name__ == '__main__':
 
     DATA_PATH = '../../data/space_shuttle_marotta_valve.csv'
-    num_units = 35
-    window = 8
+    num_units = 50
+    window = 10
     stride = 5
-    batch_size = 8
-    l_rate = 1e-1
+    batch_size = 3
+    l_rate = 1e-2
     non_train_percentage = 0.5
-    training_epochs = 10
+    training_epochs = 15
     val_rel_percentage = .5
     normalize = 'maxmin01'
     time_difference = True
-    td_method = None
+    td_method = np.log2
 
     results = LSTM_exp.lstm_exp(filename=DATA_PATH, 
                                 num_units=num_units, 
@@ -165,4 +165,21 @@ if __name__ == '__main__':
     top_n = 10
     cols = [col for col in bfd.best_fit_distribution(np.array(results['Test_Errors']).ravel(), top_n=top_n)]
     top_n_distr = pd.DataFrame(cols, index=['NAME', 'PARAMS', 'ERRORS'])
-    print("\n\nTop distributions: NAME ERRORS PARAM ", top_n_distr)   
+    print("\n\nTop distributions: NAME ERRORS PARAM ", top_n_distr)
+    
+    file_ptr = np.loadtxt('../../__tmp/__tmp_res.csv', dtype=object)
+    for i in range(top_n):
+        
+        file_ptr = np.append(file_ptr, top_n_distr[i]['NAME'])
+    
+    np.savetxt('../../__tmp/__tmp_res.csv', file_ptr, fmt='%s')
+    
+    # save sMAPE of each model
+    sMAPE_error_len = len(np.array(results['Test_Errors']).ravel())
+    sMAPE_den = np.abs(np.array(results['Y_HAT']).ravel()[:sMAPE_error_len])+np.abs(np.array(results['Y_test']).ravel()[:sMAPE_error_len])
+    perc_error = np.mean((200*np.abs(np.array(results['Test_Errors']).ravel()[:sMAPE_error_len]))/sMAPE_den)
+    print("Percentage error: ", perc_error)
+    
+    file_ptr = np.loadtxt('../../__tmp/__tmp_err.csv', dtype=object)
+    file_ptr = np.append(file_ptr, str(perc_error))
+    np.savetxt('../../__tmp/__tmp_err.csv', file_ptr, fmt='%s') 
