@@ -20,8 +20,8 @@ if __name__ == '__main__':
 
     DATA_PATH = '../../data/space_shuttle_marotta_valve.csv'
     num_units = 64
-    window = 25
-    stride = 10
+    window = 5
+    stride = 2
     batch_size = 5
     l_rate = 1e-2
     non_train_percentage = 0.5

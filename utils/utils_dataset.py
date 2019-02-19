@@ -339,29 +339,26 @@ def lstm_exp(filename,
         last_error_on_valid = np.inf
         current_error_on_valid = .0
         
-        for e in range(epochs + 1):
+        e = 0
+        while e < (epochs + 1):
 
             iter_ = 0
-            print("Epoch ", e + 1)
+            print("\n\nEpoch ", e + 1)
            
-            if e < epochs - 2:
-                
-                print("Past error on valid: ", last_error_on_valid)
-                print("Current total error on train: ", current_error_on_valid)
-                
-                if not(stop_on_growing_error) or current_error_on_valid<=last_error_on_valid:
+            if e < epochs - 2:                
+                                           
+                while iter_ < int(np.floor(X.shape[0] / batch_size)):
                     
-                    last_error_on_valid = current_error_on_valid
+                    batch_x = X[np.newaxis, iter_ * batch_size:batch_size * (iter_ + 1)]
+                    batch_y = Y[np.newaxis, iter_ * batch_size:batch_size * (iter_ + 1)]
+
+                    sess.run(opt, feed_dict={x: batch_x, y: batch_y})
+                                               
+                    iter_ = iter_ + 1
+                
+                if stop_on_growing_error:
+
                     current_error_on_valid = .0
-                    
-                    while iter_ < int(np.floor(X.shape[0] / batch_size)):
-                        
-                        batch_x = X[np.newaxis, iter_ * batch_size:batch_size * (iter_ + 1)]
-                        batch_y = Y[np.newaxis, iter_ * batch_size:batch_size * (iter_ + 1)]
-    
-                        sess.run(opt, feed_dict={x: batch_x, y: batch_y})
-                                                   
-                        iter_ = iter_ + 1
                     
                     # verificate stop condition
                     iter_val_ = 0
@@ -374,12 +371,16 @@ def lstm_exp(filename,
                         current_error_on_valid +=  np.abs(np.sum(sess.run(error, feed_dict={x: batch_x_val, y: batch_y_val})))
 
                         iter_val_ += 1
-                                    
-                else:
+                     
+                    print("Past error on valid: ", last_error_on_valid)
+                    print("Current total error on valid: ", current_error_on_valid)
                     
-                    print("Stop learning at epoch ", e, " out of ", epochs)
-                    e = epochs - 2
+                    if current_error_on_valid > last_error_on_valid:
                 
+                        print("Stop learning at epoch ", e, " out of ", epochs)
+                        e = epochs - 3
+                            
+                    last_error_on_valid = current_error_on_valid                
 
             # validation
             elif e == epochs - 2:
@@ -413,6 +414,8 @@ def lstm_exp(filename,
                     list_test_error.append(sess.run(error, feed_dict={x: batch_test_x, y: batch_test_y}))
 
                     iter_test_ += 1
+            
+            e += 1
 
     dict_results = {"Number_of_units": num_units, "Window_size": window,
                     "Batch_size": batch_size, "Learning_rate": l_rate,
