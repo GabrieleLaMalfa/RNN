@@ -24,18 +24,18 @@ if __name__ == '__main__':
     tf.reset_default_graph()
         
     batch_size = 1
-    sequence_len = 10
-    stride = 2
+    sequence_len = 8
+    stride = 6
     learning_rate = 1e-3
     epochs = 10
     
     # define convolutional layer(s)
     kernel_size = 3
-    number_of_filters = 10  # number of convolutions' filters for each LSTM cells
-    stride_conv = 2
+    number_of_filters = 25  # number of convolutions' filters for each LSTM cells
+    stride_conv = 1
     
     # define lstm elements
-    number_of_lstm_units = 10  # number of hidden units in each lstm
+    number_of_lstm_units = 5  # number of hidden units in each lstm
     
     
     # define input/output pairs

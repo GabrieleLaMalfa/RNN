@@ -1,3 +1,4 @@
 best_distrs = np.loadtxt('../../__tmp/__tmp_res.csv', dtype=str)
+best_distrs = best_distrs.reshape(N_EXP, 10)
 top1 = plt.hist(np.array(best_distrs[:,0].flatten()))
 top3 = plt.hist(np.array(best_distrs[:,:3].flatten()))

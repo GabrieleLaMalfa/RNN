@@ -233,7 +233,9 @@ def lstm_exp(filename,
              val_rel_percentage,
              normalize, 
              time_difference,
-             td_method):
+             td_method,
+             stop_on_growing_error=False,
+             stop_valid_percentage=1.):
     
     # clear computational graph
     tf.reset_default_graph()
@@ -332,21 +334,52 @@ def lstm_exp(filename,
         plot_y_hat = list()
         list_validation_error = list()
         list_test_error = list()
+        
+        # train: stop conditions (may not be evaluated)
+        last_error_on_valid = np.inf
+        current_error_on_valid = .0
+        
         for e in range(epochs + 1):
 
             iter_ = 0
             print("Epoch ", e + 1)
-
-            # train
+           
             if e < epochs - 2:
+                
+                print("Past error on valid: ", last_error_on_valid)
+                print("Current total error on train: ", current_error_on_valid)
+                
+                if not(stop_on_growing_error) or current_error_on_valid<=last_error_on_valid:
+                    
+                    last_error_on_valid = current_error_on_valid
+                    current_error_on_valid = .0
+                    
+                    while iter_ < int(np.floor(X.shape[0] / batch_size)):
+                        
+                        batch_x = X[np.newaxis, iter_ * batch_size:batch_size * (iter_ + 1)]
+                        batch_y = Y[np.newaxis, iter_ * batch_size:batch_size * (iter_ + 1)]
+    
+                        sess.run(opt, feed_dict={x: batch_x, y: batch_y})
+                                                   
+                        iter_ = iter_ + 1
+                    
+                    # verificate stop condition
+                    iter_val_ = 0
+                    while iter_val_ < int(stop_valid_percentage*np.floor(X_val.shape[0] / batch_size)):
+                        
+                        batch_x_val = X[np.newaxis, iter_val_ * batch_size:batch_size * (iter_val_ + 1)]
+                        batch_y_val = Y[np.newaxis, iter_val_ * batch_size:batch_size * (iter_val_ + 1)]
+                        
+                        # accumulate error
+                        current_error_on_valid +=  np.abs(np.sum(sess.run(error, feed_dict={x: batch_x_val, y: batch_y_val})))
 
-                while iter_ < int(np.floor(X.shape[0] / batch_size)):
-                    batch_x = X[np.newaxis, iter_ * batch_size:batch_size * (iter_ + 1)]
-                    batch_y = Y[np.newaxis, iter_ * batch_size:batch_size * (iter_ + 1)]
-
-                    sess.run(opt, feed_dict={x: batch_x, y: batch_y})
-
-                    iter_ = iter_ + 1
+                        iter_val_ += 1
+                                    
+                else:
+                    
+                    print("Stop learning at epoch ", e, " out of ", epochs)
+                    e = epochs - 2
+                
 
             # validation
             elif e == epochs - 2:
