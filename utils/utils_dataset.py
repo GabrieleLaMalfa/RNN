@@ -317,11 +317,11 @@ def lstm_exp(filename,
     # calculate loss
     loss = tf.losses.mean_squared_error(y, y_hat)
     
-    # optimization
-    opt = tf.train.GradientDescentOptimizer(learning_rate=l_rate).minimize(loss)
-
     # estimate error as the difference between prediction and target
     error = y - y_hat
+    
+    # optimization
+    opt = tf.train.GradientDescentOptimizer(learning_rate=l_rate).minimize(loss)
 
     init = tf.global_variables_initializer()
 
@@ -365,10 +365,10 @@ def lstm_exp(filename,
                     
                     # verificate stop condition
                     iter_val_ = 0
-                    while iter_val_ < int(stop_valid_percentage*np.floor(X_val.shape[0] / batch_size)):
+                    while iter_val_ < int(stop_valid_percentage * np.floor(X_val.shape[0] / batch_size)):
                         
-                        batch_x_val = X[np.newaxis, iter_val_ * batch_size:batch_size * (iter_val_ + 1)]
-                        batch_y_val = Y[np.newaxis, iter_val_ * batch_size:batch_size * (iter_val_ + 1)]
+                        batch_x_val = X_val[np.newaxis, iter_val_ * batch_size:batch_size * (iter_val_ + 1)]
+                        batch_y_val = Y_val[np.newaxis, iter_val_ * batch_size:batch_size * (iter_val_ + 1)]
                         
                         # accumulate error
                         current_error_on_valid +=  np.abs(np.sum(sess.run(error, feed_dict={x: batch_x_val, y: batch_y_val})))

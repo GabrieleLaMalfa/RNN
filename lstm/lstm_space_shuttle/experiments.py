@@ -20,10 +20,10 @@ if __name__ == '__main__':
 
     DATA_PATH = '../../data/space_shuttle_marotta_valve.csv'
     num_units = 64
-    window = 5
-    stride = 3
-    batch_size = 15
-    l_rate = 1e-4
+    window = 25
+    stride = 10
+    batch_size = 5
+    l_rate = 1e-2
     non_train_percentage = 0.5
     training_epochs = 250
     val_rel_percentage = .5
@@ -31,7 +31,7 @@ if __name__ == '__main__':
     time_difference = True
     td_method = None
     stop_on_growing_error = True
-    stop_valid_percentage = .5  # percentage of validation set used to stop learning
+    stop_valid_percentage = 1.  # percentage of validation set used to stop learning
 
     results = LSTM_exp.lstm_exp(filename=DATA_PATH, 
                                 num_units=num_units, 
