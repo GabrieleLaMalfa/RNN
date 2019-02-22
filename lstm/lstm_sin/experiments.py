@@ -30,6 +30,8 @@ if __name__ == '__main__':
     normalize = 'maxmin-11'
     time_difference = False
     td_method = None
+    stop_on_growing_error = True
+    stop_valid_percentage = 1.  # percentage of validation set used to stop learning
 
     results = LSTM_exp.lstm_exp(filename=DATA_PATH, 
                                 num_units=num_units, 
@@ -43,7 +45,9 @@ if __name__ == '__main__':
                                 val_rel_percentage=val_rel_percentage,
                                 normalize=normalize,
                                 time_difference=time_difference,
-                                td_method=td_method)
+                                td_method=td_method,
+                                stop_on_growing_error=stop_on_growing_error,
+                                stop_valid_percentage=stop_valid_percentage)
 
     # MLE on validation: estimate mean and variance
     val_errors = np.concatenate(results['Validation_Errors']).ravel()

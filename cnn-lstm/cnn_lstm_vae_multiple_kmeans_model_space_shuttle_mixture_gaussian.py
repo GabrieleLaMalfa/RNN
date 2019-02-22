@@ -20,17 +20,21 @@ import best_fit_distribution as bfd
 
 if __name__ == '__main__':
     
+    # training settings
+    stop_on_growing_error = True  # early-stopping enabler
+    stop_valid_percentage = 1.  # percentage of validation used for early-stopping
+    
     # reset computational graph
     tf.reset_default_graph()
         
-    batch_size = 10
+    batch_size = 5
     sequence_len = 6
     stride = 2
     learning_rate = 1e-4
-    epochs = 25
-    sigma_threshold = 4.  # /tau
-    n_clusters = 4  # number of clusters for the k-means
-    n_clusters_td = 2  # number of clusters for the k-means (td data)
+    epochs = 250
+    sigma_threshold = 1.  # /tau
+    n_clusters = 5  # number of clusters for the k-means
+    n_clusters_td = 5  # number of clusters for the k-means (td data)
     
     # define first convolutional layer(s)
     kernel_size_first = 3
@@ -246,7 +250,11 @@ if __name__ == '__main__':
         sess.run(init)
         
         # train
-        for e in range(epochs):
+        last_error_on_valid = np.inf
+        current_error_on_valid = .0
+        e = 0
+        
+        while e < epochs:
             
             print("epoch", e+1)
             
@@ -273,6 +281,44 @@ if __name__ == '__main__':
                 sess.run(optimizer_elbo, feed_dict={input_: cluster_batch_x})
 
                 iter_ +=  1
+            
+            if stop_on_growing_error:
+
+                current_error_on_valid = .0
+                
+                # verificate stop condition
+                iter_val_ = 0
+                while iter_val_ < int(stop_valid_percentage * np.floor(x_valid.shape[0] / batch_size)):
+                    
+                    batch_x_val = x_valid[iter_val_*batch_size: (iter_val_+1)*batch_size, :].T.reshape(1, sequence_len, batch_size)
+                    batch_y_val = y_valid[np.newaxis, iter_val_*batch_size: (iter_val_+1)*batch_size]
+
+                    # predict clusters memberships              
+                    cluster_batch_x =  x_valid_tmp[iter_val_*batch_size: (iter_val_+1)*batch_size, :].T.reshape(1, sequence_len, batch_size)           
+                    cluster_batch_x_td = x_valid[iter_val_*batch_size: (iter_val_+1)*batch_size, :].T.reshape(1, sequence_len, batch_size)
+                    mem_value = clusters_info.predict(cluster_batch_x[0,:,:].T).reshape(-1, batch_size, 1)
+                    mem_value_td = clusters_info_td.predict(cluster_batch_x_td[0,:,:].T).reshape(-1, batch_size, 1)
+                    mem = np.concatenate((clusters_info.cluster_centers_.sum(axis=1)[mem_value], 
+                                          clusters_info_td.cluster_centers_.sum(axis=1)[mem_value_td]), axis=2)             
+                    mem_indices = np.concatenate((mem_value, mem_value_td), axis=2)
+                    
+                    current_error_on_valid +=  np.abs(np.sum(sess.run(prediction-batch_y, feed_dict={input_: batch_x_val,
+                                                                                                     mem_cluster: mem,
+                                                                                                     target: batch_y_val})))
+                    
+                    iter_val_ += 1
+                    
+                print("Past error on valid: ", last_error_on_valid)
+                print("Current total error on valid: ", current_error_on_valid)
+                
+                if current_error_on_valid > last_error_on_valid:
+            
+                    print("Stop learning at epoch ", e, " out of ", epochs)
+                    e = epochs
+                        
+                last_error_on_valid = current_error_on_valid  
+    
+            e += 1
 
         # validation: we use the td clusters
         errors_valid = list(list() for _ in range(n_clusters_td))

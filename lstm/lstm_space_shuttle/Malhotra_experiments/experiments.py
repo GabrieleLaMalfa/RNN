@@ -19,17 +19,19 @@ import best_fit_distribution as bfd
 if __name__ == '__main__':
 
     DATA_PATH = '../../../data/space_shuttle_marotta_valve.csv'
-    num_units = 20
-    window = 8
-    stride = 5
-    batch_size = 8
+    num_units = 64
+    window = 5
+    stride = 2
+    batch_size = 5
     l_rate = 1e-2
     non_train_percentage = 0.5
     training_epochs = 10
     val_rel_percentage = .5
-    normalize = 'maxmin01'
+    normalize = 'maxmin-11'
     time_difference = True
     td_method = None
+    stop_on_growing_error = True
+    stop_valid_percentage = 1.  # percentage of validation set used to stop learning
 
     results = LSTM_exp.lstm_exp(filename=DATA_PATH, 
                                 num_units=num_units, 
@@ -43,7 +45,9 @@ if __name__ == '__main__':
                                 val_rel_percentage=val_rel_percentage,
                                 normalize=normalize,
                                 time_difference=time_difference,
-                                td_method=td_method)
+                                td_method=td_method,
+                                stop_on_growing_error=stop_on_growing_error,
+                                stop_valid_percentage=stop_valid_percentage)
 
     # MLE on validation: estimate mean and variance
     val_errors = np.concatenate(results['Validation_Errors']).ravel()

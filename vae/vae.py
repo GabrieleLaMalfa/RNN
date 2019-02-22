@@ -21,9 +21,9 @@ if __name__ == '__main__':
     tf.reset_default_graph()
         
     # data parameters
-    batch_size = 10
+    batch_size = 1
     sequence_len = 15
-    stride = 2
+    stride = 5
     
     # training epochs
     epochs = 25
@@ -31,7 +31,14 @@ if __name__ == '__main__':
     # define VAE parameters
     learning_rate_elbo = 1e-5
     vae_hidden_size = 5
-    sigma_threshold_elbo = 4.
+    sigma_threshold_elbo = np.array([1. for _ in range(vae_hidden_size)])
+    
+    # number of sampling per iteration
+    samples_per_iter = 10
+    
+    # early-stopping parameters
+    stop_on_growing_error = True  # early-stopping enabler
+    stop_valid_percentage = 1.  # percentage of validation used for early-stopping    
     
     # define input/output pairs
     input_ = tf.placeholder(tf.float32, [None, sequence_len, batch_size])  # (batch, input, time)
@@ -71,7 +78,7 @@ if __name__ == '__main__':
     scale = tf.squeeze(scale, 0)
     
     vae_hidden_distr = tf.contrib.distributions.MultivariateNormalDiag(loc, scale)    
-    vae_hidden_state = vae_hidden_distr.sample()
+    vae_hidden_state = tf.reduce_mean([vae_hidden_distr.sample() for _ in range(samples_per_iter)], axis=0)
     
     feed_decoder = tf.reshape(vae_hidden_state, shape=(-1, vae_hidden_size))
     vae_decoder = tf.matmul(feed_decoder, weights_vae_decoder[0]) + bias_vae_decoder[0]
@@ -93,7 +100,7 @@ if __name__ == '__main__':
     divergence = tf.contrib.distributions.kl_divergence(vae_hidden_distr, prior)
     elbo = tf.reduce_mean(likelihood - divergence)
     
-    optimizer_elbo = tf.train.AdamOptimizer(learning_rate_elbo).minimize(elbo)  
+    optimizer_elbo = tf.train.AdamOptimizer(learning_rate_elbo).minimize(-elbo)  
 
     # extract train and test
     x_train, y_train, x_valid, y_valid, x_test, y_test = utils.generate_batches(
@@ -135,7 +142,7 @@ if __name__ == '__main__':
         
     print("Datasets shapes: ", x_train.shape, y_train.shape, x_valid.shape, y_valid.shape, x_test.shape, y_test.shape)
     
-    # train the model
+    # train + early-stopping
     init = tf.global_variables_initializer()
 
     with tf.Session() as sess:
@@ -143,7 +150,11 @@ if __name__ == '__main__':
         sess.run(init)
         
         # train
-        for e in range(epochs):
+        last_error_on_valid = np.inf
+        current_error_on_valid = .0
+        e = 0
+        
+        while e < epochs:
             
             print("epoch", e+1)
             
@@ -158,6 +169,36 @@ if __name__ == '__main__':
                 sess.run(optimizer_elbo, feed_dict={input_: batch_x})
                 
                 iter_ +=  1
+
+            if stop_on_growing_error:
+
+                current_error_on_valid = .0
+                
+                # verificate stop condition
+                iter_val_ = 0
+                while iter_val_ < int(stop_valid_percentage * np.floor(x_valid.shape[0] / batch_size)):
+                    
+                    batch_x_val = x_valid[iter_val_*batch_size: (iter_val_+1)*batch_size, :].T.reshape(1, sequence_len, batch_size)
+                    batch_y_val = y_valid[np.newaxis, iter_val_*batch_size: (iter_val_+1)*batch_size]
+                    
+                    # accumulate error
+                    current_error_on_valid +=  np.abs(np.sum(sess.run(-elbo, feed_dict={input_: batch_x_val, 
+                                                                                        target: batch_y_val})))
+
+                    iter_val_ += 1
+                 
+                print("Past error on valid: ", last_error_on_valid)
+                print("Current total error on valid: ", current_error_on_valid)
+                
+                if current_error_on_valid > last_error_on_valid:
+            
+                    print("Stop learning at epoch ", e, " out of ", epochs)
+                    e = epochs
+                        
+                last_error_on_valid = current_error_on_valid                
+
+            
+            e += 1
                 
         # test
         y_test = y_test[:x_test.shape[0]]
@@ -166,7 +207,6 @@ if __name__ == '__main__':
         vae_anomalies = np.zeros(shape=(int(np.floor(x_test.shape[0] / batch_size))))
         
         threshold_elbo = scistats.multivariate_normal.pdf(mean_elbo-sigma_threshold_elbo, mean_elbo, std_elbo)
-
         
         iter_ = 0
         
@@ -194,6 +234,4 @@ if __name__ == '__main__':
     plt.legend(loc='best')
         
     fig.tight_layout()
-    plt.show()
-
-    
+    plt.show()    

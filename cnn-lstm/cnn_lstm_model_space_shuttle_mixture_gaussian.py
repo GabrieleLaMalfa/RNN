@@ -20,14 +20,18 @@ import best_fit_distribution as bfd
 
 if __name__ == '__main__':
     
+    # training settings
+    stop_on_growing_error = True  # early-stopping enabler
+    stop_valid_percentage = 1.  # percentage of validation used for early-stopping
+    
     # reset computational graph
     tf.reset_default_graph()
         
-    batch_size = 5
+    batch_size = 8
     sequence_len = 5
     stride = 2
-    learning_rate = 1e-3
-    epochs = 10
+    learning_rate = 1e-4
+    epochs = 250
     
     # define convolutional layer(s)
     kernel_size = 3
@@ -35,9 +39,9 @@ if __name__ == '__main__':
     stride_conv = 1
     
     # define lstm elements
-    number_of_lstm_units = 35  # number of hidden units in each lstm
+    number_of_lstm_units = 64  # number of hidden units in each lstm
     
-    prediction_threshold = 6.
+    prediction_threshold = 1.
     n_mixtures = 1  
     
     # define input/output pairs
@@ -96,8 +100,11 @@ if __name__ == '__main__':
     # dense layer: prediction
     prediction = tf.tensordot(tf.reshape(outputs, shape=(batch_size, number_of_lstm_units)), weights_dense, 2) + bias_dense
     
+    # error
+    error = target-prediction
+    
     # loss evaluation
-    loss = tf.nn.l2_loss(target-prediction)
+    loss = tf.nn.l2_loss(error)
     
     # optimization algorithm
     optimizer = tf.train.AdamOptimizer(learning_rate).minimize(loss)        
@@ -110,7 +117,7 @@ if __name__ == '__main__':
                                                              mode='validation', 
                                                              non_train_percentage=.5,
                                                              val_rel_percentage=.5,
-                                                             normalize='maxmin01',
+                                                             normalize='maxmin-11',
                                                              time_difference=True,
                                                              td_method=None)
     
@@ -150,7 +157,11 @@ if __name__ == '__main__':
         sess.run(init)
         
         # train
-        for e in range(epochs):
+        last_error_on_valid = np.inf
+        current_error_on_valid = .0
+        e = 0
+        
+        while e < epochs:
             
             print("epoch", e+1)
             
@@ -165,6 +176,36 @@ if __name__ == '__main__':
                                                target: batch_y})   
     
                 iter_ +=  1
+
+            if stop_on_growing_error:
+
+                current_error_on_valid = .0
+                
+                # verificate stop condition
+                iter_val_ = 0
+                while iter_val_ < int(stop_valid_percentage * np.floor(x_valid.shape[0] / batch_size)):
+                    
+                    batch_x_val = x_valid[iter_val_*batch_size: (iter_val_+1)*batch_size, :].T.reshape(1, sequence_len, batch_size)
+                    batch_y_val = y_valid[np.newaxis, iter_val_*batch_size: (iter_val_+1)*batch_size]
+                    
+                    # accumulate error
+                    current_error_on_valid +=  np.abs(np.sum(sess.run(error, feed_dict={input_: batch_x_val, 
+                                                                                        target: batch_y_val})))
+
+                    iter_val_ += 1
+                 
+                print("Past error on valid: ", last_error_on_valid)
+                print("Current total error on valid: ", current_error_on_valid)
+                
+                if current_error_on_valid > last_error_on_valid:
+            
+                    print("Stop learning at epoch ", e, " out of ", epochs)
+                    e = epochs
+                        
+                last_error_on_valid = current_error_on_valid                
+
+            
+            e += 1
 
         # validation
         errors_valid = np.zeros(shape=(len(x_valid), batch_size))

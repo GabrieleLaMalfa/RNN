@@ -19,11 +19,11 @@ import best_fit_distribution as bfd
 if __name__ == '__main__':
 
     DATA_PATH = '../../data/space_shuttle_marotta_valve.csv'
-    num_units = 64
-    window = 5
-    stride = 2
+    num_units = 128
+    window = 15
+    stride = 5
     batch_size = 5
-    l_rate = 1e-2
+    l_rate = 1e-3
     non_train_percentage = 0.5
     training_epochs = 250
     val_rel_percentage = .5
