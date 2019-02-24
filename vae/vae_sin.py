@@ -22,31 +22,32 @@ if __name__ == '__main__':
         
     # data parameters
     batch_size = 1
-    sequence_len = 15
-    stride = 5
+    sequence_len = 35
+    stride = 10
     
     # training epochs
-    epochs = 25
+    epochs = 100
     
     # define VAE parameters
-    learning_rate_elbo = 1e-5
-    vae_hidden_size = 5
-    sigma_threshold_elbo = np.array([1. for _ in range(vae_hidden_size)])
-    
+    learning_rate_elbo = 5e-2
+    vae_hidden_size = 4
+    tstud_degrees_of_freedom = 3.
+    sigma_threshold_elbo = 1e-3
+       
     # number of sampling per iteration
-    samples_per_iter = 10
+    samples_per_iter = 1
     
     # early-stopping parameters
     stop_on_growing_error = True  # early-stopping enabler
-    stop_valid_percentage = 1.  # percentage of validation used for early-stopping    
+    stop_valid_percentage = .2  # percentage of validation used for early-stopping    
     
     # define input/output pairs
     input_ = tf.placeholder(tf.float32, [None, sequence_len, batch_size])  # (batch, input, time)
     target = tf.placeholder(tf.float32, [None, batch_size])  # (batch, output)
     
     # parameters' initialization
-    vae_encoder_shape_weights = [batch_size*sequence_len, 35, vae_hidden_size*2]
-    vae_decoder_shape_weights = [vae_hidden_size, 25, batch_size*sequence_len]
+    vae_encoder_shape_weights = [batch_size*sequence_len, vae_hidden_size*2]
+    vae_decoder_shape_weights = [vae_hidden_size, batch_size*sequence_len]
     
     zip_weights_encoder = zip(vae_encoder_shape_weights[:-1], vae_encoder_shape_weights[1:])
     
@@ -67,7 +68,7 @@ if __name__ == '__main__':
     
     for (w_vae, b_vae) in zip(weights_vae_encoder[1:], bias_vae_encoder[1:]):
         
-        vae_encoder = tf.nn.relu(vae_encoder)
+        vae_encoder = tf.nn.leaky_relu(vae_encoder)
         vae_encoder = tf.matmul(vae_encoder, w_vae) + b_vae
     
     # means and variances' vectors of the learnt hidden distribution
@@ -77,21 +78,25 @@ if __name__ == '__main__':
     scale = tf.slice(tf.nn.softplus(vae_encoder), [0, vae_hidden_size], [-1, vae_hidden_size])
     scale = tf.squeeze(scale, 0)
     
-    vae_hidden_distr = tf.contrib.distributions.MultivariateNormalDiag(loc, scale)    
+    vae_hidden_distr = tf.contrib.distributions.MultivariateNormalDiag(loc, scale)  
     vae_hidden_state = tf.reduce_mean([vae_hidden_distr.sample() for _ in range(samples_per_iter)], axis=0)
+    
+    # probability of the *single* sample (no multisampling) --> used in test phase
+    vae_hidden_pdf = vae_hidden_distr.prob(vae_hidden_distr.sample())
     
     feed_decoder = tf.reshape(vae_hidden_state, shape=(-1, vae_hidden_size))
     vae_decoder = tf.matmul(feed_decoder, weights_vae_decoder[0]) + bias_vae_decoder[0]
-    vae_decoder = tf.nn.relu(vae_decoder)    
+    vae_decoder = tf.nn.leaky_relu(vae_decoder)    
     
     for (w_vae, b_vae) in zip(weights_vae_decoder[1:], bias_vae_decoder[1:]):
         
         vae_decoder = tf.matmul(vae_decoder, w_vae) + b_vae
-        vae_decoder = tf.nn.relu(vae_decoder)
+        vae_decoder = tf.nn.leaky_relu(vae_decoder)
     
     # time-series reconstruction and ELBO loss
-    vae_reconstruction = tf.contrib.distributions.MultivariateNormalDiag(tf.constant(np.zeros(batch_size*sequence_len, dtype='float32')),
-                                                                         tf.constant(np.ones(batch_size*sequence_len, dtype='float32')))
+    vae_reconstruction = tf.contrib.distributions.StudentT(tstud_degrees_of_freedom,
+                                                           tf.constant(np.zeros(batch_size*sequence_len, dtype='float32')),
+                                                           tf.constant(np.ones(batch_size*sequence_len, dtype='float32')))
     likelihood = vae_reconstruction.log_prob(flattened_input)
     
     prior = tf.contrib.distributions.MultivariateNormalDiag(tf.constant(np.zeros(vae_hidden_size, dtype='float32')),
@@ -104,14 +109,14 @@ if __name__ == '__main__':
 
     # extract train and test
     x_train, y_train, x_valid, y_valid, x_test, y_test = utils.generate_batches(
-                                                             filename='../data/space_shuttle_marotta_valve.csv', 
+                                                             filename='../data/sin.csv', 
                                                              window=sequence_len,
                                                              stride=stride,
                                                              mode='validation', 
                                                              non_train_percentage=.5,
                                                              val_rel_percentage=.5,
                                                              normalize='maxmin-11',
-                                                             time_difference=False,
+                                                             time_difference=True,
                                                              td_method=None)
        
     # suppress second axis on Y values (the algorithms expects shapes like (n,) for the prediction)
@@ -199,14 +204,17 @@ if __name__ == '__main__':
 
             
             e += 1
-                
+            
         # test
         y_test = y_test[:x_test.shape[0]]
-        mean_elbo = np.zeros(shape=vae_hidden_size)
-        std_elbo = np.eye(vae_hidden_size)
+        mean_elbo = .0
+        std_elbo = 1.
         vae_anomalies = np.zeros(shape=(int(np.floor(x_test.shape[0] / batch_size))))
         
-        threshold_elbo = scistats.multivariate_normal.pdf(mean_elbo-sigma_threshold_elbo, mean_elbo, std_elbo)
+        threshold_elbo = scistats.t.pdf(mean_elbo-sigma_threshold_elbo, 
+                                        df=tstud_degrees_of_freedom,
+                                        loc=mean_elbo, 
+                                        scale=std_elbo)
         
         iter_ = 0
         
@@ -215,11 +223,8 @@ if __name__ == '__main__':
             batch_x = x_test[iter_*batch_size: (iter_+1)*batch_size, :].T.reshape(1, sequence_len, batch_size)
             batch_y = y_test[np.newaxis, iter_*batch_size: (iter_+1)*batch_size]
                         
-            # test if the VAE encoding is anomalous for the sample
-            test_hidden_state = sess.run(vae_hidden_state, feed_dict={input_: batch_x})
-            vae_anomalies[iter_] =  scistats.multivariate_normal.pdf(test_hidden_state, 
-                                                                     np.zeros(shape=vae_hidden_size), 
-                                                                     np.eye(vae_hidden_size))
+            # get probability of the encoding           
+            vae_anomalies[iter_] =  sess.run(vae_hidden_pdf, feed_dict={input_: batch_x})
                                        
             iter_ +=  1
             
@@ -234,4 +239,14 @@ if __name__ == '__main__':
     plt.legend(loc='best')
         
     fig.tight_layout()
-    plt.show()    
+    plt.show()   
+    
+    # plot the graph
+    fig, ax1 = plt.subplots()
+    ax1.plot(y_test, 'b', label='test set')
+    ax1.set_ylabel('time')
+    plt.legend(loc='best')
+    
+    fig.tight_layout()
+    plt.show() 
+    
