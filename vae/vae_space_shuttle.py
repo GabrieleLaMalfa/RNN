@@ -22,7 +22,7 @@ if __name__ == '__main__':
         
     # data parameters
     batch_size = 1
-    sequence_len = 30
+    sequence_len = 20
     stride = 1
     
     # training epochs
@@ -196,7 +196,7 @@ if __name__ == '__main__':
                 print("Current total abs error on valid: ", current_error_on_valid)
                 
                 # stop learning if the loss reduction is below 1% (current_loss/past_loss)
-                if current_error_on_valid > last_error_on_valid or (np.abs(current_error_on_valid/last_error_on_valid) > .99 and e==0):
+                if current_error_on_valid > last_error_on_valid or (np.abs(current_error_on_valid/last_error_on_valid) > .99 and e!=0):
             
                     if current_error_on_valid > last_error_on_valid:
                         

@@ -376,7 +376,7 @@ def lstm_exp(filename,
                     print("Current total error on valid: ", current_error_on_valid)
                     
                 # stop learning if the loss reduction is below 1% (current_loss/past_loss)
-                if current_error_on_valid > last_error_on_valid or (np.abs(current_error_on_valid/last_error_on_valid) > .99 and e==0):
+                if current_error_on_valid > last_error_on_valid or (np.abs(current_error_on_valid/last_error_on_valid) > .99 and e!=0):
             
                     if current_error_on_valid > last_error_on_valid:
                         
