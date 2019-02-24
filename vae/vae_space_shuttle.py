@@ -22,14 +22,14 @@ if __name__ == '__main__':
         
     # data parameters
     batch_size = 1
-    sequence_len = 20
+    sequence_len = 50
     stride = 1
     
     # training epochs
     epochs = 100
     
     # define VAE parameters
-    learning_rate_elbo = 2e-3
+    learning_rate_elbo = 1e-2
     vae_hidden_size = 5
     tstud_degrees_of_freedom = 3.
     sigma_threshold_elbo = 1e-3

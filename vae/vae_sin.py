@@ -39,7 +39,8 @@ if __name__ == '__main__':
     
     # early-stopping parameters
     stop_on_growing_error = True  # early-stopping enabler
-    stop_valid_percentage = .2  # percentage of validation used for early-stopping    
+    stop_valid_percentage = .5  # percentage of validation used for early-stopping    
+    min_loss_improvment = .005  # percentage of minimum loss' decrease (.01 is 1%)
     
     # define input/output pairs
     input_ = tf.placeholder(tf.float32, [None, sequence_len, batch_size])  # (batch, input, time)
@@ -193,7 +194,7 @@ if __name__ == '__main__':
                     iter_val_ += 1
                  
                 # stop learning if the loss reduction is below 1% (current_loss/past_loss)
-                if current_error_on_valid > last_error_on_valid or (np.abs(current_error_on_valid/last_error_on_valid) > .99 and e!=0):
+                if current_error_on_valid > last_error_on_valid or (np.abs(current_error_on_valid/last_error_on_valid) > 1-min_loss_improvment and e!=0):
             
                     if current_error_on_valid > last_error_on_valid:
                         
