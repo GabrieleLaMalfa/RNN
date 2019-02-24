@@ -22,20 +22,20 @@ if __name__ == '__main__':
         
     # data parameters
     batch_size = 1
-    sequence_len = 15
-    stride = 7
+    sequence_len = 30
+    stride = 1
     
     # training epochs
     epochs = 100
     
     # define VAE parameters
-    learning_rate_elbo = 5e-2
-    vae_hidden_size = 8
+    learning_rate_elbo = 2e-3
+    vae_hidden_size = 5
     tstud_degrees_of_freedom = 3.
     sigma_threshold_elbo = 1e-3
        
     # number of sampling per iteration in the VAE hidden layer
-    samples_per_iter = 1
+    samples_per_iter = 15
     
     # early-stopping parameters
     stop_on_growing_error = True
@@ -46,8 +46,8 @@ if __name__ == '__main__':
     target = tf.placeholder(tf.float32, [None, batch_size])  # (batch, output)
     
     # parameters' initialization
-    vae_encoder_shape_weights = [batch_size*sequence_len, vae_hidden_size*2]
-    vae_decoder_shape_weights = [vae_hidden_size, batch_size*sequence_len]
+    vae_encoder_shape_weights = [batch_size*sequence_len, 15, vae_hidden_size*2]
+    vae_decoder_shape_weights = [vae_hidden_size, 20, batch_size*sequence_len]
     
     zip_weights_encoder = zip(vae_encoder_shape_weights[:-1], vae_encoder_shape_weights[1:])
     
@@ -193,10 +193,19 @@ if __name__ == '__main__':
                     iter_val_ += 1
                  
                 print("Past error on valid: ", last_error_on_valid)
-                print("Current total error on valid: ", current_error_on_valid)
+                print("Current total abs error on valid: ", current_error_on_valid)
                 
-                if current_error_on_valid > last_error_on_valid:
+                # stop learning if the loss reduction is below 1% (current_loss/past_loss)
+                if current_error_on_valid > last_error_on_valid or (np.abs(current_error_on_valid/last_error_on_valid) > .99 and e==0):
             
+                    if current_error_on_valid > last_error_on_valid:
+                        
+                        print("Loss function has increased wrt to past iteration.")
+                    
+                    else:
+                        
+                        print("Loss' decrement is below 1% (relative).")
+                    
                     print("Stop learning at epoch ", e, " out of ", epochs)
                     e = epochs
                         
@@ -234,9 +243,9 @@ if __name__ == '__main__':
     ax1.set_ylabel('VAE: Anomalies likelihood')
     plt.legend(loc='best')
     
-    # highlights elbo's boundary
-    ax1.plot(np.array([threshold_elbo for _ in range(len(vae_anomalies))]), 'r', label='threshold')
-    plt.legend(loc='best')
+#    # highlights elbo's boundary
+#    ax1.plot(np.array([threshold_elbo for _ in range(len(vae_anomalies))]), 'r', label='threshold')
+#    plt.legend(loc='best')
         
     fig.tight_layout()
     plt.show()   

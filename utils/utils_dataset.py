@@ -375,12 +375,21 @@ def lstm_exp(filename,
                     print("Past error on valid: ", last_error_on_valid)
                     print("Current total error on valid: ", current_error_on_valid)
                     
+                # stop learning if the loss reduction is below 1% (current_loss/past_loss)
+                if current_error_on_valid > last_error_on_valid or (np.abs(current_error_on_valid/last_error_on_valid) > .99 and e==0):
+            
                     if current_error_on_valid > last_error_on_valid:
-                
-                        print("Stop learning at epoch ", e, " out of ", epochs)
-                        e = epochs - 3
-                            
-                    last_error_on_valid = current_error_on_valid                
+                        
+                        print("Loss function has increased wrt to past iteration.")
+                    
+                    else:
+                        
+                        print("Loss' decrement is below 1% (relative).")
+                    
+                    print("Stop learning at epoch ", e, " out of ", epochs)
+                    e = epochs - 3
+                        
+                last_error_on_valid = current_error_on_valid                
 
             # validation
             elif e == epochs - 2:
