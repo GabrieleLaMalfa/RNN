@@ -20,17 +20,17 @@ import best_fit_distribution as bfd
 if __name__ == '__main__':
 
     DATA_PATH = '../../data/power_consumption.csv'
-    window = 8
-    stride = 3
-    batch_size = 8
-    lstm_params = [25, 25]
-    lstm_activation = [tf.nn.sigmoid, tf.nn.sigmoid]
+    window = 5
+    stride = 1
+    batch_size = 15
+    lstm_params = [50]
+    lstm_activation = [tf.nn.tanh]
     l_rate = 1e-2
     non_train_percentage = 0.3
     training_epochs = 5
     val_rel_percentage = .8
-    normalize = 'maxmin01'
-    time_difference = True
+    normalize = 'maxmin-11'
+    time_difference = False
     td_method = None
     stop_on_growing_error = True
     stop_valid_percentage = 1.  # percentage of validation set used to stop learning

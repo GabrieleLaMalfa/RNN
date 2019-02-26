@@ -22,10 +22,10 @@ if __name__ == '__main__':
     DATA_PATH = '../../../data/space_shuttle_marotta_valve.csv'
     window = 5
     stride = 1
-    batch_size = 20
-    lstm_params = [25, 25]
+    batch_size = 5
+    lstm_params = [35, 35]
     lstm_activation = [tf.nn.leaky_relu, tf.nn.leaky_relu]
-    l_rate = 1e-2
+    l_rate = 2e-4
     non_train_percentage = 0.5
     training_epochs = 10
     val_rel_percentage = .5
