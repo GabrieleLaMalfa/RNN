@@ -222,7 +222,6 @@ def generate_batches(filename,
  Define lstm for all the /lstm modules
 """
 def lstm_exp(filename, 
-             num_units, 
              window,
              stride,
              batch_size, 

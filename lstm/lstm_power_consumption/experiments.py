@@ -20,7 +20,6 @@ import best_fit_distribution as bfd
 if __name__ == '__main__':
 
     DATA_PATH = '../../data/power_consumption.csv'
-    num_units = 50
     window = 8
     stride = 3
     batch_size = 8
@@ -37,7 +36,6 @@ if __name__ == '__main__':
     stop_valid_percentage = 1.  # percentage of validation set used to stop learning
 
     results = LSTM_exp.lstm_exp(filename=DATA_PATH, 
-                                num_units=num_units, 
                                 window=window,
                                 stride=stride,
                                 batch_size=batch_size,
