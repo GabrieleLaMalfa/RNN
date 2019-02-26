@@ -20,17 +20,17 @@ import best_fit_distribution as bfd
 if __name__ == '__main__':
 
     DATA_PATH = '../../data/space_shuttle_marotta_valve.csv'
-    window = 15
-    stride = 5
-    batch_size = 5
-    lstm_params = [25]
+    window = 5
+    stride = 1
+    batch_size = 20
+    lstm_params = [35]
     lstm_activation = [tf.nn.tanh]
-    l_rate = 1e-3
+    l_rate = 2e-3
     non_train_percentage = 0.5
     training_epochs = 250
     val_rel_percentage = .5
     normalize = 'maxmin-11'
-    time_difference = True
+    time_difference = False
     td_method = None
     stop_on_growing_error = True
     stop_valid_percentage = 1.  # percentage of validation set used to stop learning

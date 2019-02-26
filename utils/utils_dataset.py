@@ -426,7 +426,7 @@ def lstm_exp(filename,
             
             e += 1
 
-    dict_results = {"Number_of_units": num_units, "Window_size": window,
+    dict_results = {"Window_size": window,
                     "Batch_size": batch_size, "Learning_rate": l_rate,
                     "Y": plot_y, "Y_HAT": plot_y_hat,
                     "X_train": X, "Y_train": Y, "X_test": X_test, "Y_test": Y_test,
