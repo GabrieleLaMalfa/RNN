@@ -122,19 +122,9 @@ if __name__ == '__main__':
     
     # dense layer: prediction
     prediction = tf.tensordot(tf.reshape(outputs, shape=(batch_size, number_of_lstm_units)), weights_dense, 2) + bias_dense
-#    prediction = tf.nn.relu(prediction)
     
-#    # exponential decay of the predictions
-#    decay = tf.constant(np.array([2**(-i) for i in range(batch_size+2)], dtype='float32'))
-#    prediction = prediction*decay
-
     # loss evaluation
-    # calculate loss (L2, MSE, huber, hinge, sMAPE: leave uncommented one of them)
     loss = tf.nn.l2_loss(target-prediction)
-#    loss = tf.losses.mean_squared_error(target, prediction)
-#    loss = tf.losses.huber_loss(target, prediction, delta=.25)
-#    loss = tf.losses.hinge_loss(target, prediction)
-#    loss = (200/batch_size)*tf.reduce_mean(tf.abs(target-prediction))/tf.reduce_mean(target+prediction)
     
     # optimization algorithm
     optimizer = tf.train.AdamOptimizer(learning_rate).minimize(loss)

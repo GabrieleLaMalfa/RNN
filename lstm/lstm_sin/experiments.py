@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import scipy.stats as scistats
 import sys as sys
+import tensorflow as tf
 
 sys.path.append('../../utils')
 import utils_dataset as LSTM_exp
@@ -23,6 +24,8 @@ if __name__ == '__main__':
     window = 5
     stride = 3
     batch_size = 3
+    lstm_params = [25]
+    lstm_activation = [tf.nn.tanh]
     l_rate = 1e-2
     non_train_percentage = .5
     training_epochs = 10
@@ -38,6 +41,8 @@ if __name__ == '__main__':
                                 window=window,
                                 stride=stride,
                                 batch_size=batch_size,
+                                lstm_params=lstm_params,
+                                lstm_activation=lstm_activation,
                                 l_rate=l_rate, 
                                 non_train_percentage=non_train_percentage, 
                                 training_epochs=training_epochs,

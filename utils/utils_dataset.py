@@ -226,6 +226,8 @@ def lstm_exp(filename,
              window,
              stride,
              batch_size, 
+             lstm_params,
+             lstm_activation,
              l_rate,
              non_train_percentage, 
              training_epochs, 
@@ -242,7 +244,7 @@ def lstm_exp(filename,
 
     # define LSTM features: time steps/hidden layers
     batch_size = batch_size  # length of LSTM networks (n. of LSTM)
-    num_units = num_units  # hidden layer in each LSTM
+    
     # size of each input
     window = window
 
@@ -288,7 +290,7 @@ def lstm_exp(filename,
 
     # final dense layer: declare variable shapes: weights and bias
     weights = tf.get_variable('weights', 
-                              shape=[num_units, batch_size, batch_size], 
+                              shape=[lstm_params[-1], batch_size, batch_size], 
                               initializer=tf.truncated_normal_initializer())
     bias = tf.get_variable('bias', 
                            shape=[1, batch_size], 
@@ -297,28 +299,27 @@ def lstm_exp(filename,
     # placeholders (input)
     x = tf.placeholder("float", [None, batch_size, window]) # (batch, time, input)
     y = tf.placeholder("float", [None, batch_size])  # (batch, output)
-
-    # define the LSTM cells
-    cell = tf.nn.rnn_cell.LSTMCell(num_units, 
-                                   forget_bias=1.,
-                                   state_is_tuple=True,
-                                   activation=tf.nn.tanh,
-                                   initializer=tf.contrib.layers.xavier_initializer())
     
-    initial_state = cell.zero_state(1, tf.float32)
-    outputs, _ = tf.nn.dynamic_rnn(cell, 
+    # define the LSTM cells
+    cells = [tf.contrib.rnn.LSTMCell(lstm_params[i],                                   
+                                     forget_bias=1.,
+                                     state_is_tuple=True,
+                                     activation=lstm_activation[i],
+                                     initializer=tf.contrib.layers.xavier_initializer()) for i in range(len(lstm_params))]
+
+    multi_rnn_cell = tf.nn.rnn_cell.MultiRNNCell(cells)    
+    outputs, _ = tf.nn.dynamic_rnn(multi_rnn_cell, 
                                    x,
-                                   initial_state=initial_state,
                                    dtype="float32")
 
     # dense layer: prediction
-    y_hat = tf.tensordot(tf.reshape(outputs, shape=(batch_size, num_units)), weights, 2) + bias
-    
-    # calculate loss
-    loss = tf.losses.mean_squared_error(y, y_hat)
-    
+    y_hat = tf.tensordot(tf.reshape(outputs, shape=(batch_size, lstm_params[-1])), weights, 2) + bias
+
     # estimate error as the difference between prediction and target
     error = y - y_hat
+    
+    # calculate loss
+    loss = tf.nn.l2_loss(error)
     
     # optimization
     opt = tf.train.GradientDescentOptimizer(learning_rate=l_rate).minimize(loss)
