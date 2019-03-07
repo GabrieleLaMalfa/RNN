@@ -432,5 +432,4 @@ def lstm_exp(filename,
                     "X_train": X, "Y_train": Y, "X_test": X_test, "Y_test": Y_test,
                     "Validation_Errors": list_validation_error, "Test_Errors": list_test_error}
     return dict_results
-
     

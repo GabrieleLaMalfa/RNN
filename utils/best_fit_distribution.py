@@ -28,19 +28,35 @@ def best_fit_distribution(data, bins=200, ax=None, top_n=3):
     y, x = np.histogram(data, bins=bins, density=True)
     x = (x + np.roll(x, -1))[:-1] / 2.0
 
-    # Distributions to check
-    DISTRIBUTIONS = [        
-        st.alpha,st.anglit,st.arcsine,st.beta,st.betaprime,st.bradford,st.burr,st.cauchy,st.chi,st.chi2,st.cosine,
-        st.dgamma,st.dweibull,st.erlang,st.expon,st.exponnorm,st.exponweib,st.exponpow,st.f,st.fatiguelife,st.fisk,
-        st.foldcauchy,st.foldnorm,st.frechet_r,st.frechet_l,st.genlogistic,st.genpareto,st.gennorm,st.genexpon,
-        st.genextreme,st.gausshyper,st.gamma,st.gengamma,st.genhalflogistic,st.gilbrat,st.gompertz,st.gumbel_r,
-        st.gumbel_l,st.halfcauchy,st.halflogistic,st.halfnorm,st.halfgennorm,st.hypsecant,st.invgamma,st.invgauss,
-        st.invweibull,st.johnsonsb,st.johnsonsu,st.ksone,st.kstwobign,st.laplace,st.levy,st.levy_l,st.levy_stable,
-        st.logistic,st.loggamma,st.loglaplace,st.lognorm,st.lomax,st.maxwell,st.mielke,st.nakagami,st.ncx2,st.ncf,
-        st.nct,st.norm,st.pareto,st.pearson3,st.powerlaw,st.powerlognorm,st.powernorm,st.rdist,st.reciprocal,
-        st.rayleigh,st.rice,st.recipinvgauss,st.semicircular,st.t,st.triang,st.truncexpon,st.truncnorm,st.tukeylambda,
-        st.uniform,st.vonmises,st.vonmises_line,st.wald,st.weibull_min,st.weibull_max,st.wrapcauchy
-    ]
+    """ Distributions used to fit:
+        		Beta Distribution
+        		Binomial Distribution
+        		Chi-Square Distribution
+        		Discrete Uniform Distribution
+        		Exponential Distribution
+        		Gamma Distribution
+        		Geometric Distribution
+        		Hypergeometric Distribution
+        		Laplace Distribution
+        		Logistic Distribution
+        		Multinomial Distribution
+        		Negative Binomial Distribution
+        		Normal Distribution
+        		Bivariate Normal Distribution
+        		Log-normal Distribution
+        		Pareto Distribution
+        		Poisson Distribution
+        		Snedecor F Distribution
+        		Student-t Distribution
+        		Non-centered Student-t Distribution
+        		Triangular Distribution
+        		Weibull Distribution
+    """
+    DISTRIBUTIONS = [     
+                        st.beta,st.binom,st.chi,st.uniform,st.expon,st.gamma,st.geom,st.hypergeom,
+                        st.laplace,st.logistic,st.multinomial,st.nbinom,st.norm,st.multivariate_normal,
+                        st.norm,st.pareto,st.poisson,st.f,st.nct,st.t,st.triang,st.dweibull
+                    ]
 
     # Best holders
     best_distribution = DISTRIBUTIONS[:top_n]

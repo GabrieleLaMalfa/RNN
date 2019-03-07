@@ -14,32 +14,52 @@ import tensorflow as tf
 sys.path.append('../utils')
 import utils_dataset as utils
 
-
-if __name__ == '__main__':
+   
+def vae(filename, 
+         sequence_len,
+         stride,
+         batch_size, 
+         cnn_sizes,
+         cnn_activations,
+         cnn_pooling,
+         cnn_l_rate,  # used with "auxiliary" loss
+         global_features,
+         vae_hidden_size,
+         tstud_degrees_of_freedom,
+         l_rate,
+         non_train_percentage, 
+         training_epochs, 
+         l_rate_test,
+         val_rel_percentage,
+         normalize, 
+         time_difference,
+         td_method,
+         stop_on_growing_error=False,
+         stop_valid_percentage=1.):
     
     # reset computational graph
     tf.reset_default_graph()
         
     # data parameters
     batch_size = 1
-    sequence_len = 30
+    sequence_len = 35
     stride = 10
     
     # training epochs
     epochs = 100
     
     # define VAE parameters
-    learning_rate_elbo = 1e-2
-    vae_hidden_size = 5
-    tstud_degrees_of_freedom = 5.
+    learning_rate_elbo = 5e-2
+    vae_hidden_size = 4
+    tstud_degrees_of_freedom = 3.
     sigma_threshold_elbo = 1e-3
        
-    # number of sampling per iteration in the VAE hidden layer
-    samples_per_iter = 15
+    # number of sampling per iteration
+    samples_per_iter = 1
     
     # early-stopping parameters
-    stop_on_growing_error = True
-    stop_valid_percentage = .5  # percentage of validation used for early-stopping 
+    stop_on_growing_error = True  # early-stopping enabler
+    stop_valid_percentage = .5  # percentage of validation used for early-stopping    
     min_loss_improvment = .005  # percentage of minimum loss' decrease (.01 is 1%)
     
     # define input/output pairs
@@ -110,14 +130,14 @@ if __name__ == '__main__':
 
     # extract train and test
     x_train, y_train, x_valid, y_valid, x_test, y_test = utils.generate_batches(
-                                                             filename='../data/space_shuttle_marotta_valve.csv', 
+                                                             filename='../data/sin.csv', 
                                                              window=sequence_len,
                                                              stride=stride,
                                                              mode='validation', 
-                                                             non_train_percentage=.4,
+                                                             non_train_percentage=.5,
                                                              val_rel_percentage=.5,
                                                              normalize='maxmin-11',
-                                                             time_difference=False,
+                                                             time_difference=True,
                                                              td_method=None)
        
     # suppress second axis on Y values (the algorithms expects shapes like (n,) for the prediction)
@@ -193,9 +213,6 @@ if __name__ == '__main__':
 
                     iter_val_ += 1
                  
-                print("Past error on valid: ", last_error_on_valid)
-                print("Current total abs error on valid: ", current_error_on_valid)
-                
                 # stop learning if the loss reduction is below 1% (current_loss/past_loss)
                 if current_error_on_valid > last_error_on_valid or (np.abs(current_error_on_valid/last_error_on_valid) > 1-min_loss_improvment and e!=0):
             
@@ -205,7 +222,7 @@ if __name__ == '__main__':
                     
                     else:
                         
-                        print("Loss' decrement is below ", min_loss_improvment*100,"% (relative).")
+                        print("Loss' decrement is below 1% (relative).")
                     
                     print("Stop learning at epoch ", e, " out of ", epochs)
                     e = epochs
@@ -244,9 +261,9 @@ if __name__ == '__main__':
     ax1.set_ylabel('VAE: Anomalies likelihood')
     plt.legend(loc='best')
     
-#    # highlights elbo's boundary
-#    ax1.plot(np.array([threshold_elbo for _ in range(len(vae_anomalies))]), 'r', label='threshold')
-#    plt.legend(loc='best')
+    # highlights elbo's boundary
+    ax1.plot(np.array([threshold_elbo for _ in range(len(vae_anomalies))]), 'r', label='threshold')
+    plt.legend(loc='best')
         
     fig.tight_layout()
     plt.show()   

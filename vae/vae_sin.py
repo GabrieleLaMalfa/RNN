@@ -22,20 +22,20 @@ if __name__ == '__main__':
         
     # data parameters
     batch_size = 1
-    sequence_len = 35
+    sequence_len = 15
     stride = 10
     
     # training epochs
     epochs = 100
     
     # define VAE parameters
-    learning_rate_elbo = 5e-2
-    vae_hidden_size = 4
-    tstud_degrees_of_freedom = 3.
+    learning_rate_elbo = 1e-3
+    vae_hidden_size = 3
+    tstud_degrees_of_freedom = 7.
     sigma_threshold_elbo = 1e-3
        
     # number of sampling per iteration
-    samples_per_iter = 1
+    samples_per_iter = 30
     
     # early-stopping parameters
     stop_on_growing_error = True  # early-stopping enabler
@@ -193,6 +193,9 @@ if __name__ == '__main__':
 
                     iter_val_ += 1
                  
+                print("Past error on valid: ", last_error_on_valid)
+                print("Current total abs error on valid: ", current_error_on_valid)
+                
                 # stop learning if the loss reduction is below 1% (current_loss/past_loss)
                 if current_error_on_valid > last_error_on_valid or (np.abs(current_error_on_valid/last_error_on_valid) > 1-min_loss_improvment and e!=0):
             
@@ -202,7 +205,7 @@ if __name__ == '__main__':
                     
                     else:
                         
-                        print("Loss' decrement is below 1% (relative).")
+                        print("Loss' decrement is below ", min_loss_improvment*100,"% (relative).")
                     
                     print("Stop learning at epoch ", e, " out of ", epochs)
                     e = epochs

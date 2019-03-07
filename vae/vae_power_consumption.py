@@ -22,7 +22,7 @@ if __name__ == '__main__':
         
     # data parameters
     batch_size = 1
-    sequence_len = 30
+    sequence_len = 35
     stride = 10
     
     # training epochs
@@ -30,8 +30,8 @@ if __name__ == '__main__':
     
     # define VAE parameters
     learning_rate_elbo = 1e-2
-    vae_hidden_size = 5
-    tstud_degrees_of_freedom = 5.
+    vae_hidden_size = 6
+    tstud_degrees_of_freedom = 8.
     sigma_threshold_elbo = 1e-3
        
     # number of sampling per iteration in the VAE hidden layer
@@ -39,7 +39,7 @@ if __name__ == '__main__':
     
     # early-stopping parameters
     stop_on_growing_error = True
-    stop_valid_percentage = .5  # percentage of validation used for early-stopping 
+    stop_valid_percentage = 1.  # percentage of validation used for early-stopping 
     min_loss_improvment = .005  # percentage of minimum loss' decrease (.01 is 1%)
     
     # define input/output pairs
@@ -47,8 +47,8 @@ if __name__ == '__main__':
     target = tf.placeholder(tf.float32, [None, batch_size])  # (batch, output)
     
     # parameters' initialization
-    vae_encoder_shape_weights = [batch_size*sequence_len, vae_hidden_size*2]
-    vae_decoder_shape_weights = [vae_hidden_size, batch_size*sequence_len]
+    vae_encoder_shape_weights = [batch_size*sequence_len, 15, vae_hidden_size*2]
+    vae_decoder_shape_weights = [vae_hidden_size, 20, batch_size*sequence_len]
     
     zip_weights_encoder = zip(vae_encoder_shape_weights[:-1], vae_encoder_shape_weights[1:])
     
