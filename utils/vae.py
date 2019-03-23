@@ -189,7 +189,6 @@ def vae(filename,
             while iter_ < int(np.floor(x_train.shape[0] / batch_size)):
         
                 batch_x = x_train[iter_*batch_size: (iter_+1)*batch_size, :].T.reshape(1, sequence_len, batch_size)
-                batch_y = y_train[np.newaxis, iter_*batch_size: (iter_+1)*batch_size]
         
                 # run VAE encoding-decoding
                 sess.run(optimizer_elbo, feed_dict={input_: batch_x})
@@ -248,7 +247,6 @@ def vae(filename,
         while iter_ < int(np.floor(x_test.shape[0] / batch_size)):
     
             batch_x = x_test[iter_*batch_size: (iter_+1)*batch_size, :].T.reshape(1, sequence_len, batch_size)
-            batch_y = y_test[np.newaxis, iter_*batch_size: (iter_+1)*batch_size]
                         
             # get probability of the encoding           
             vae_anomalies[iter_] =  sess.run(vae_hidden_pdf, feed_dict={input_: batch_x})

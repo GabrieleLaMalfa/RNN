@@ -8,7 +8,7 @@ Created on Sat Nov 24 15:27:05 2018
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import scipy.stats as scistats
+import scipy.stats as scistats  # ignore eventual warning, it is used (badly)
 import sys as sys
 import tensorflow as tf
 
@@ -20,16 +20,16 @@ import best_fit_distribution as bfd
 if __name__ == '__main__':
 
     DATA_PATH = '../../data/space_shuttle_marotta_valve.csv'
-    window = 5
+    window = 3
     stride = 1
-    batch_size = 20
-    lstm_params = [35]
+    batch_size = 15
+    lstm_params = [60]
     lstm_activation = [tf.nn.tanh]
-    l_rate = 2e-3
+    l_rate = 1e-4
     non_train_percentage = 0.5
     training_epochs = 250
     val_rel_percentage = .5
-    normalize = 'maxmin-11'
+    normalize = 'maxmin01'
     time_difference = False
     td_method = None
     stop_on_growing_error = True
@@ -54,12 +54,16 @@ if __name__ == '__main__':
 
     # MLE on validation: estimate mean and variance
     val_errors = np.concatenate(results['Validation_Errors']).ravel()
-    mean = np.mean(val_errors)
-    std = np.std(val_errors)
+    best_fitting, fitting_params, _ = bfd.best_fit_distribution(val_errors, top_n=1)
+    best_fitting = 'scistats.' + best_fitting[0]
+    fitting_params = fitting_params[0]
     
-    # Anomaly detection
-    sigma_threshold = 4.5  # /tau
-    anomaly_threshold = scistats.norm.pdf(mean-sigma_threshold*std, mean, std)
+    best_fitting_distr = eval(best_fitting)(*fitting_params)   # 'non ne EVALe la pena' (italians only)
+    
+    # anomaly detection
+    sigma_threshold = 1e-3  # n-th percentile, used for double tail test
+    anomaly_threshold = (best_fitting_distr.ppf(sigma_threshold),
+                         best_fitting_distr.ppf(1.-sigma_threshold))
 
     # turn test errors into a numpy array
     test_errors = np.concatenate(results['Test_Errors']).ravel()
@@ -69,13 +73,14 @@ if __name__ == '__main__':
     
     for i in range(len(test_errors)):
 
-        tmp = scistats.norm.pdf(test_errors[i], mean, std)
+        tmp = best_fitting_distr.cdf(test_errors[i])
+        tmp = best_fitting_distr.ppf(tmp)
 
         # don't consider the last samples as anomalies since the logarithm as 
         #  time_difference method may 'corrupt' them (and there are NO anomalies there)
-        if tmp <= anomaly_threshold and i<len(test_errors)-15:
+        if (tmp <= anomaly_threshold[0] or tmp >= anomaly_threshold[1]) and i<len(test_errors)-15:
 
-            print("\tPoint number ", i, " is an anomaly: P(x) is ", tmp)
+            print("\tPoint number ", i, " is an anomaly: P(x) is ", best_fitting_distr.cdf(tmp))
             list_anomalies.append(i)
 
     # plot results

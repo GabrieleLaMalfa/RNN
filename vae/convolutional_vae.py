@@ -23,23 +23,35 @@ if __name__ == '__main__':
     # data parameters
     batch_size = 1
     sequence_len = 50
-    stride = 20
+    stride = 10
     
     # training epochs
     epochs = 100
     
     # define VAE parameters
     learning_rate_elbo = 2e-3
-    vae_hidden_size = 3
-    tstud_degrees_of_freedom = 4.5
+    vae_hidden_size = 5
+    tstud_degrees_of_freedom = 8.
     sigma_threshold_elbo = .0
+    
+    # define convolutional layer(s)
+    conv_kernel_size = [3, 2, 2]
+    conv_number_of_filters = [35, 25, 20]
+    conv_stride = [1, 1, 1]
+    conv_pooling = [False, False, (True, 'max')]
+    
+    # define deconvolutional layer(s)
+    deconv_kernel_size = [3, 2, 2]
+    deconv_number_of_filters = [35, 25, 20]  # number of convolutions' filters for each LSTM cells
+    deconv_stride = [1, 1, 1]
+    deconv_pooling = [False, False, (True, 'max')]
        
     # number of sampling per iteration in the VAE hidden layer
     samples_per_iter = 1
     
     # early-stopping parameters
     stop_on_growing_error = True
-    stop_valid_percentage = .2  # percentage of validation used for early-stopping 
+    stop_valid_percentage = 1.  # percentage of validation used for early-stopping 
     min_loss_improvment = .005  # percentage of minimum loss' decrease (.01 is 1%)
     
     # define input/output pairs
@@ -47,30 +59,40 @@ if __name__ == '__main__':
     target = tf.placeholder(tf.float32, [None, batch_size])  # (batch, output)
     
     # encoder/decoder parameters + initialization
-    vae_encoder_shape_weights = [batch_size*sequence_len, int(batch_size*sequence_len/2), vae_hidden_size*2]
-    vae_decoder_shape_weights = [vae_hidden_size, int(batch_size*sequence_len/2), batch_size*sequence_len]
+    vae_encoder_shape_weights = zip(conv_kernel_size, conv_number_of_filters)   
+    vae_decoder_shape_weights = zip(deconv_kernel_size, deconv_number_of_filters)
     
-    zip_weights_encoder = zip(vae_encoder_shape_weights[:-1], vae_encoder_shape_weights[1:])
+    # the hidden layer is fully connected so its easier to control mean and scale of the gaussian distribution
+    vae_dense_encoder_shape_weights = vae_hidden_size*2
+    vae_dense_decoder_shape_weights = vae_hidden_size
+            
+    weights_vae_encoder = [tf.Variable(tf.truncated_normal(shape=[s,
+                                                                  f,
+                                                                  1])) for (s, f) in vae_encoder_shape_weights]
+        
+    bias_vae_encoder = [tf.Variable(tf.truncated_normal(shape=[s])) for s in zip_weights_encoder[0, :-1]]
     
-    weights_vae_encoder = [tf.Variable(tf.truncated_normal(shape=[shape,
-                                                                  next_shape])) for (shape, next_shape) in zip_weights_encoder]
-    bias_vae_encoder = [tf.Variable(tf.truncated_normal(shape=[shape])) for shape in vae_encoder_shape_weights[1:]]
-    
-    zip_weights_decoder = zip(vae_decoder_shape_weights[:-1], vae_decoder_shape_weights[1:])
-    weights_vae_decoder = [tf.Variable(tf.truncated_normal(shape=[shape,
-                                                                  next_shape])) for (shape, next_shape) in zip_weights_decoder]
+    weights_vae_decoder = [tf.Variable(tf.truncated_normal(shape=[f,
+                                                                  f,
+                                                                  1])) for (s, f) in vae_decoder_shape_weights]
     bias_vae_decoder = [tf.Variable(tf.truncated_normal(shape=[shape])) for shape in vae_decoder_shape_weights[1:]]
     
     #
     # VAE graph's definition
     flattened_input = tf.layers.flatten(input_)
     
-    vae_encoder = tf.matmul(flattened_input, weights_vae_encoder[0]) + bias_vae_encoder[0]
+    vae_encoder = tf.nn.conv1d(flattened_input,
+                               filters=weights_vae_encoder[0], 
+                               stride=conv_stride[0], 
+                               padding='SAME')
     
-    for (w_vae, b_vae) in zip(weights_vae_encoder[1:], bias_vae_encoder[1:]):
+    for (w_vae, b_vae, stride_vae) in zip(weights_vae_encoder[1:], bias_vae_encoder[1:], conv_stride):
         
         vae_encoder = tf.nn.leaky_relu(vae_encoder)
-        vae_encoder = tf.matmul(vae_encoder, w_vae) + b_vae
+        vae_encoder = tf.nn.conv1d(vae_encoder,
+                                   filters=w_vae, 
+                                   stride=stride_vae, 
+                                   padding='SAME') + b_vae
     
     # means and variances' vectors of the learnt hidden distribution
     #  we assume the hidden gaussian's variances matrix is diagonal

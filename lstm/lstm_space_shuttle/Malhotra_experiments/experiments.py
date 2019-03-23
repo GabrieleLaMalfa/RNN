@@ -54,12 +54,18 @@ if __name__ == '__main__':
 
     # MLE on validation: estimate mean and variance
     val_errors = np.concatenate(results['Validation_Errors']).ravel()
-    mean = np.mean(val_errors)
-    std = np.std(val_errors)
+    best_fitting, fitting_params, _ = bfd.best_fit_distribution(val_errors, top_n=1)
+    best_fitting = 'scistats.' + best_fitting[0]
+    fitting_params = fitting_params[0]
+    
+    best_fitting_distr = eval(best_fitting)(*fitting_params)   # 'non ne EVALe la pena' (italians only)
+    mean = best_fitting_distr.mean()
+    std = best_fitting_distr.std()
     
     # Anomaly detection
-    sigma_threshold = 5.  # /tau
-    anomaly_threshold = scistats.norm.pdf(mean-sigma_threshold*std, mean, std)
+    sigma_threshold = .05  # /tau
+    anomaly_threshold = (best_fitting_distr.ppf(sigma_threshold),
+                         best_fitting_distr.ppf(1-sigma_threshold))
 
     # turn test errors into a numpy array
     test_errors = np.concatenate(results['Test_Errors']).ravel()
@@ -69,11 +75,11 @@ if __name__ == '__main__':
     
     for i in range(len(test_errors)):
 
-        tmp = scistats.norm.pdf(test_errors[i], mean, std)
+        tmp = test_errors[i]
 
         # don't consider the last samples as anomalies since the logarithm as 
         #  time_difference method may 'corrupt' them (and there are NO anomalies there)
-        if tmp <= anomaly_threshold and i < len(test_errors)-15:
+        if (tmp <= anomaly_threshold[0] or tmp >= anomaly_threshold[1]) and i<len(test_errors)-15:
 
             print("\tPoint number ", i, " is an anomaly: P(x) is ", tmp)
             list_anomalies.append(i)

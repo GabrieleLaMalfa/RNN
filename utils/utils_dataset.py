@@ -139,7 +139,7 @@ def generate_batches(filename,
     data = (data.iloc[:, 0]).values
 
     # normalize dataset (max-min method)
-    if normalize is 'maxmin01':
+    if normalize == 'maxmin01':
         
         data = (data-np.min(data))/(np.max(data)-np.min(data))
     

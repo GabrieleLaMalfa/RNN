@@ -22,20 +22,20 @@ if __name__ == '__main__':
         
     # data parameters
     batch_size = 1
-    sequence_len = 15
+    sequence_len = 25
     stride = 10
     
     # training epochs
     epochs = 100
     
     # define VAE parameters
-    learning_rate_elbo = 1e-3
-    vae_hidden_size = 3
-    tstud_degrees_of_freedom = 7.
-    sigma_threshold_elbo = 1e-3
+    learning_rate_elbo = 2e-3
+    vae_hidden_size = 2
+    tstud_degrees_of_freedom = 3.
+    sigma_threshold_elbo = .0
        
     # number of sampling per iteration
-    samples_per_iter = 30
+    samples_per_iter = 1
     
     # early-stopping parameters
     stop_on_growing_error = True  # early-stopping enabler
@@ -46,9 +46,9 @@ if __name__ == '__main__':
     input_ = tf.placeholder(tf.float32, [None, sequence_len, batch_size])  # (batch, input, time)
     target = tf.placeholder(tf.float32, [None, batch_size])  # (batch, output)
     
-    # parameters' initialization
-    vae_encoder_shape_weights = [batch_size*sequence_len, vae_hidden_size*2]
-    vae_decoder_shape_weights = [vae_hidden_size, batch_size*sequence_len]
+    # encoder/decoder parameters + initialization
+    vae_encoder_shape_weights = [batch_size*sequence_len, int(batch_size*sequence_len/2), vae_hidden_size*2]
+    vae_decoder_shape_weights = [vae_hidden_size, int(batch_size*sequence_len/2), batch_size*sequence_len]
     
     zip_weights_encoder = zip(vae_encoder_shape_weights[:-1], vae_encoder_shape_weights[1:])
     
@@ -83,7 +83,7 @@ if __name__ == '__main__':
     vae_hidden_state = tf.reduce_mean([vae_hidden_distr.sample() for _ in range(samples_per_iter)], axis=0)
     
     # probability of the *single* sample (no multisampling) --> used in test phase
-    vae_hidden_pdf = vae_hidden_distr.prob(vae_hidden_distr.sample())
+    vae_hidden_prob = vae_hidden_distr.prob(vae_hidden_distr.sample())
     
     feed_decoder = tf.reshape(vae_hidden_state, shape=(-1, vae_hidden_size))
     vae_decoder = tf.matmul(feed_decoder, weights_vae_decoder[0]) + bias_vae_decoder[0]
@@ -234,9 +234,51 @@ if __name__ == '__main__':
             batch_y = y_test[np.newaxis, iter_*batch_size: (iter_+1)*batch_size]
                         
             # get probability of the encoding           
-            vae_anomalies[iter_] =  sess.run(vae_hidden_pdf, feed_dict={input_: batch_x})
+            vae_anomalies[iter_] =  sess.run(vae_hidden_prob, feed_dict={input_: batch_x})
                                        
             iter_ +=  1
+
+        # validation set likelihood
+        y_valid = y_valid[:y_valid.shape[0]]
+        mean_elbo = .0
+        std_elbo = 1.
+        vae_valid = np.zeros(shape=(int(np.floor(x_valid.shape[0] / batch_size))))
+        
+        threshold_elbo = scistats.t.pdf(mean_elbo-sigma_threshold_elbo, 
+                                        df=tstud_degrees_of_freedom,
+                                        loc=mean_elbo, 
+                                        scale=std_elbo)
+        
+        iter_ = 0
+        
+        while iter_ < int(np.floor(x_valid.shape[0] / batch_size)):
+    
+            batch_x = x_valid[iter_*batch_size: (iter_+1)*batch_size, :].T.reshape(1, sequence_len, batch_size)
+            batch_y = y_valid[np.newaxis, iter_*batch_size: (iter_+1)*batch_size]
+                        
+            # get probability of the encoding           
+            vae_valid[iter_] =  sess.run(vae_hidden_prob, feed_dict={input_: batch_x})
+                                       
+            iter_ +=  1
+
+    # validation
+    # plot likelihood for validation set (i.e. non anomalous data)
+    fig, ax1 = plt.subplots()
+    ax1.plot(vae_valid, 'r', label='likelihood on test data')
+    ax1.set_ylabel('VAE: Anomalies likelihood')
+    plt.legend(loc='best')
+    
+    fig.tight_layout()
+    plt.show() 
+    
+    # plot validation set
+    fig, ax1 = plt.subplots()
+    ax1.plot(y_valid, 'r', label='validation set')
+    ax1.set_ylabel('time')
+    plt.legend(loc='best')
+    
+    fig.tight_layout()
+    plt.show() 
             
     # plot vae likelihood values
     fig, ax1 = plt.subplots()
@@ -244,9 +286,11 @@ if __name__ == '__main__':
     ax1.set_ylabel('VAE: Anomalies likelihood')
     plt.legend(loc='best')
     
+    """
     # highlights elbo's boundary
     ax1.plot(np.array([threshold_elbo for _ in range(len(vae_anomalies))]), 'r', label='threshold')
     plt.legend(loc='best')
+    """
         
     fig.tight_layout()
     plt.show()   
