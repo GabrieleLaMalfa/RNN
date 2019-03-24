@@ -236,7 +236,8 @@ def lstm_exp(filename,
              time_difference,
              td_method,
              stop_on_growing_error=False,
-             stop_valid_percentage=1.):
+             stop_valid_percentage=1.,
+             verbose=True):
     
     # clear computational graph
     tf.reset_default_graph()
@@ -283,9 +284,13 @@ def lstm_exp(filename,
     
     if mismatch is True: 
         
-        print("Mismatched dimensions due to generate batches: this will be corrected automatically.")
+        if verbose: 
         
-    print("Datasets shapes: ", X.shape, Y.shape, X_val.shape, Y_val.shape, X_test.shape, Y_test.shape)
+            print("Mismatched dimensions due to generate batches: this will be corrected automatically.")
+    
+    if verbose: 
+            
+        print("Datasets shapes: ", X.shape, Y.shape, X_val.shape, Y_val.shape, X_test.shape, Y_test.shape)
 
     # final dense layer: declare variable shapes: weights and bias
     weights = tf.get_variable('weights', 
@@ -343,7 +348,10 @@ def lstm_exp(filename,
         while e < (epochs + 1):
 
             iter_ = 0
-            print("\n\nEpoch ", e + 1)
+            
+            if verbose: 
+        
+                print("\n\nEpoch ", e + 1)
            
             if e < epochs - 2:                
                                            
@@ -372,21 +380,30 @@ def lstm_exp(filename,
 
                         iter_val_ += 1
                      
-                    print("Past error on valid: ", last_error_on_valid)
-                    print("Current total error on valid: ", current_error_on_valid)
+                    if verbose: 
+        
+                        print("Past error on valid: ", last_error_on_valid)
+                        print("Current total error on valid: ", current_error_on_valid)
                     
                 # stop learning if the loss reduction is below 0.5% (current_loss/past_loss)
                 if current_error_on_valid > last_error_on_valid or (np.abs(current_error_on_valid/last_error_on_valid) > .995 and e!=0):
             
                     if current_error_on_valid > last_error_on_valid:
                         
-                        print("Loss function has increased wrt to past iteration.")
+                        if verbose: 
+                            
+                            print("Loss function has increased wrt to past iteration.")
                     
                     else:
                         
-                        print("Loss' decrement is below 1% (relative).")
-                    
-                    print("Stop learning at epoch ", e, " out of ", epochs)
+                        if verbose: 
+                            
+                            print("Loss' decrement is below 1% (relative).")
+                            
+                    if verbose:
+                        
+                        print("Stop learning at epoch ", e, " out of ", epochs)
+                        
                     e = epochs - 3
                         
                 last_error_on_valid = current_error_on_valid                
@@ -394,7 +411,9 @@ def lstm_exp(filename,
             # validation
             elif e == epochs - 2:
 
-                print(" Validation epoch:")
+                if verbose:
+                    
+                    print(" Validation epoch:")
 
                 iter_val_ = 0
                 while iter_val_ < int(np.floor(X_val.shape[0] / batch_size)):
@@ -409,8 +428,11 @@ def lstm_exp(filename,
 
             # test
             elif e == epochs - 1:
-                                
-                print(" Test epoch:")
+                 
+                if verbose:
+                    
+                    print(" Test epoch:")
+                
                 iter_test_ = 0
                 while iter_test_ < int(np.floor(X_test.shape[0] / batch_size)):
 
