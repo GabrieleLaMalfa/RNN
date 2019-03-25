@@ -21,13 +21,13 @@ if __name__ == '__main__':
 
     DATA_PATH = '../../data/space_shuttle_marotta_valve.csv'
     
-    window = 15
+    window = 5
     stride = 1
-    batch_size = 20
-    sigma_threshold = 1e-3  # n-th percentile, used for double tail test
-    l_rate = 1e-4
+    batch_size = 10
+    sigma_threshold = 1e-2  # n-th percentile, used for double tail test
+    l_rate = 3e-4
     
-    lstm_params = [40]
+    lstm_params = [50]
     lstm_activation = [tf.nn.tanh]
     non_train_percentage = 0.5
     training_epochs = 250

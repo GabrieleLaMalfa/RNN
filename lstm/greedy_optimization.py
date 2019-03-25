@@ -19,12 +19,12 @@ if __name__ == '__main__':
     min_total_exp = 10  # number of experiments that cannot fail
     
     # define the optimization parameters' space
-    WINDOW = [2, 5, 10, 15]
+    WINDOW = [2, 3, 5, 10, 15]
     STRIDE = [1, 'half', 'window']
-    BATCH = [5, 7, 10, 15]
+    BATCH = [3, 5, 7, 10, 15]
     LSTM_PARAMS = [50, 80]
-    THRESHOLD = [1e-3, 3e-3, 5e-3, 1e-2]
-    L_RATE = [1e-3, 5e-3]
+    THRESHOLD = [5e-3, 1e-2, 5e-2]
+    L_RATE = [5e-4, 1e-3]
     
     PARAMETERS = [WINDOW, STRIDE, BATCH, LSTM_PARAMS, THRESHOLD, L_RATE]
     
@@ -93,6 +93,10 @@ if __name__ == '__main__':
         
             for i in range(total_exp):
                 
+                if n_ignored_experiments > 10:
+                    
+                    break
+                
                 try:
                     
                     # optimize with the new parameters
@@ -114,11 +118,17 @@ if __name__ == '__main__':
                 total_recall /= n_successful_exp
                 total_sMAPE /= n_successful_exp
                 
-                if target_score(total_precision, total_recall) and (n_successful_exp >= min_total_exp):
+                if target_score(total_precision, total_recall):
                     
-                    objective_reached = True
-                    initial_params = new_params.copy()
-                    break
+                    if (n_successful_exp >= min_total_exp):
+                    
+                        objective_reached = True
+                        initial_params = new_params.copy()
+                        break
+                    
+                    else:
+                        
+                        print("Precision and recall are fine but there's no enough experiments to confirm the hypotesis.")
                 
                 # prevent numerical errors with precision and recall
                 if total_precision == 0.:
