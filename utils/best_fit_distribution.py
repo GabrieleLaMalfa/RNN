@@ -57,6 +57,7 @@ def best_fit_distribution(data, bins=200, ax=None, top_n=3):
                         st.laplace,st.logistic,st.multinomial,st.nbinom,st.norm,st.multivariate_normal,
                         st.norm,st.pareto,st.poisson,st.f,st.nct,st.t,st.triang,st.dweibull
                     ]
+    
 
     # Best holders
     best_distribution = DISTRIBUTIONS[:top_n]

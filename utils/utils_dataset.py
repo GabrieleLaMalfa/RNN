@@ -311,11 +311,11 @@ def lstm_exp(filename,
                                      activation=lstm_activation[i],
                                      initializer=tf.contrib.layers.xavier_initializer()) for i in range(len(lstm_params))]
 
-    multi_rnn_cell = tf.nn.rnn_cell.MultiRNNCell(cells)    
+    multi_rnn_cell = tf.nn.rnn_cell.MultiRNNCell(cells)  
     outputs, _ = tf.nn.dynamic_rnn(multi_rnn_cell, 
                                    x,
                                    dtype="float32")
-
+    
     # dense layer: prediction
     y_hat = tf.tensordot(tf.reshape(outputs, shape=(batch_size, lstm_params[-1])), weights, 2) + bias
 

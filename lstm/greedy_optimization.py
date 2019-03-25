@@ -6,6 +6,7 @@ Created on Sat Mar 23 14:41:35 2019
 """
 
 import numpy as np
+import tensorflow as tf
 
 import experiments as lstm_experiments
 
@@ -25,8 +26,10 @@ if __name__ == '__main__':
     LSTM_PARAMS = [50, 80]
     THRESHOLD = [5e-3, 1e-2, 5e-2]
     L_RATE = [5e-4, 1e-3]
+    ACTIVATION = [tf.nn.leaky_relu, tf.nn.tanh, tf.nn.sigmoid]
+    NORMALIZATION = ['maxmin01', 'maxmin-11']
     
-    PARAMETERS = [WINDOW, STRIDE, BATCH, LSTM_PARAMS, THRESHOLD, L_RATE]
+    PARAMETERS = [WINDOW, STRIDE, BATCH, LSTM_PARAMS, THRESHOLD, L_RATE, ACTIVATION, NORMALIZATION]
     
     # collect initial random (and best so far..) parameters
     params_seed = [np.random.randint(0, len(p)) for p in PARAMETERS]

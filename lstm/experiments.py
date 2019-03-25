@@ -21,14 +21,16 @@ def lstm_experiment(data_path,
                     batch_size,
                     lstm_params,
                     sigma_threshold,
-                    l_rate):
+                    l_rate,
+                    activation,
+                    normalization):
     
     lstm_params = [lstm_params]
-    lstm_activation = [tf.nn.tanh]
+    lstm_activation = [activation]
     non_train_percentage = 0.5
     training_epochs = 250
     val_rel_percentage = .5
-    normalize = 'maxmin01'
+    normalize = normalization
     time_difference = False
     td_method = None
     stop_on_growing_error = True
