@@ -214,7 +214,7 @@ def vae_experiment(data_path,
         # train 50%, validation_relative 50%
         # performances
         target_anomalies = np.zeros(shape=int(np.floor(y_test.shape[0] / batch_size))*batch_size)
-        target_anomalies[520:540] = 1
+        target_anomalies[500:600] = 1
     
         # real values
         condition_positive = np.argwhere(target_anomalies == 1)

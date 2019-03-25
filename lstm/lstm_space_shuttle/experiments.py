@@ -22,12 +22,12 @@ if __name__ == '__main__':
     DATA_PATH = '../../data/space_shuttle_marotta_valve.csv'
     
     window = 5
-    stride = 1
+    stride = 2
     batch_size = 10
-    sigma_threshold = 1e-2  # n-th percentile, used for double tail test
-    l_rate = 3e-4
+    sigma_threshold = 4e-3  # n-th percentile, used for double tail test
+    l_rate = 5e-4
     
-    lstm_params = [50]
+    lstm_params = [35]
     lstm_activation = [tf.nn.tanh]
     non_train_percentage = 0.5
     training_epochs = 250
@@ -150,7 +150,7 @@ if __name__ == '__main__':
     
     # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
     # train 50%, validation_relative 50%
-    target_anomalies[520:540] = 1
+    target_anomalies[500:600] = 1
     
     # real values
     condition_positive = np.argwhere(target_anomalies == 1)

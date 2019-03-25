@@ -89,7 +89,7 @@ def lstm_experiment(data_path,
     
     # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
     # train 50%, validation_relative 50%
-    target_anomalies[520:540] = 1
+    target_anomalies[500:600] = 1
     
     # real values
     condition_positive = np.argwhere(target_anomalies == 1)
