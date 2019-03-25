@@ -46,14 +46,20 @@ if __name__ == '__main__':
     # greedy search for the best parameters
     total_precision = 0.
     total_recall = 0.
-    total_sMAPE = 0.
+    total_sMAPE = 200.
     prev_best_f1 = 0.
     
-    is_first_round = True  # optimize all the params in the row, if this is the very first attempt
+    is_not_first_round = False  # optimize all the params in the row, if this is the very first attempt
     target_score = lambda p, r: (p >= .7 and r >= .1)
     objective_reached = target_score(total_precision, total_recall)
       
     while (objective_reached is False):
+        
+        print("###########################")
+        print("Best model has those parameters: ", initial_params)
+        print("sMAPE of the best model is: ", total_sMAPE)
+        print("Precision and recall are: ", (total_precision, total_recall))
+        print("###########################")
     
         # choose a random dimension and optimize over it
         opt_dim = np.random.randint(0, len(PARAMETERS))
@@ -63,12 +69,18 @@ if __name__ == '__main__':
                 
         for p in PARAMETERS[opt_dim]:
             
-            if p == best_param_over_dim and is_first_round:
+            # skip optimization on the same parameters (except for the first round)
+            if p == best_param_over_dim:
                 
-                is_first_round = False
-                continue
+                if is_not_first_round:
+                
+                    continue  
+                
+                else:
+                    
+                    is_not_first_round = True
             
-            # assign the new paramater and check if this configuration optimizes the F1-score
+            # assign the new paramater and check if this configuration optimizes the sMAPE
             new_params = initial_params.copy()
             new_params[opt_dim] = p
             
@@ -96,7 +108,8 @@ if __name__ == '__main__':
         
             for i in range(total_exp):
                 
-                if n_ignored_experiments > 10:
+                # break once we collect 10 fails/successes
+                if n_ignored_experiments > 10 or n_successful_exp >= 10:
                     
                     break
                 
@@ -141,13 +154,12 @@ if __name__ == '__main__':
                 if total_recall == 0.:
                     
                     total_recall = 1e-5
-                    
+                     
                 actual_f1 = 2*(total_precision * total_recall)/(total_precision + total_recall)
-                
                 if actual_f1 > prev_best_f1:
                     
                     initial_params[opt_dim] = p
-                    prev_best_f1 = actual_f1  
+                    prev_best_f1 = actual_f1 
             
             except:
                 
