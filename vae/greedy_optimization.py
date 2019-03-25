@@ -7,7 +7,7 @@ Created on Sat Mar 23 14:41:35 2019
 
 import numpy as np
 
-import experiments as lstm_experiments
+import experiments as vae_experiments
 
 if __name__ == '__main__':
     
@@ -15,18 +15,18 @@ if __name__ == '__main__':
     data_path = '../data/space_shuttle_marotta_valve.csv'
     
     # experiments per optimization's round
-    total_exp = 20
-    min_total_exp = 10  # number of experiments that cannot fail
+    total_exp = 1
     
     # define the optimization parameters' space
-    WINDOW = [2, 5, 10, 15]
+    SEQUENCE_LEN = [15, 20, 25, 35, 50]
     STRIDE = [1, 'half', 'window']
-    BATCH = [5, 7, 10, 15]
-    LSTM_PARAMS = [50, 80]
-    THRESHOLD = [1e-3, 3e-3, 5e-3, 1e-2]
-    L_RATE = [1e-3, 5e-3]
+    BATCH = [1]
+    VAE_HIDDEN_SIZE = [2, 3, 4, 5, 10]
+    TSTUD_DEG = [2., 2.5, 3., 4., 5., 7., 10.]
+    SIGMA_THRESHOLD = [1e-3, 3e-3, 5e-3, 1e-2]
+    L_RATE_ELBO = [1e-3, 5e-3]
     
-    PARAMETERS = [WINDOW, STRIDE, BATCH, LSTM_PARAMS, THRESHOLD, L_RATE]
+    PARAMETERS = [SEQUENCE_LEN, STRIDE, BATCH, VAE_HIDDEN_SIZE, TSTUD_DEG, SIGMA_THRESHOLD, L_RATE_ELBO]
     
     # collect initial random (and best so far..) parameters
     params_seed = [np.random.randint(0, len(p)) for p in PARAMETERS]
@@ -43,11 +43,10 @@ if __name__ == '__main__':
     # greedy search for the best parameters
     total_precision = 0.
     total_recall = 0.
-    total_sMAPE = 0.
     prev_best_f1 = 0.
     
     is_first_round = True  # optimize all the params in the row, if this is the very first attempt
-    target_score = lambda p, r: (p >= .7 and r >= .1)
+    target_score = lambda p, r: (p > .6 and r > .2)
     objective_reached = target_score(total_precision, total_recall)
       
     while (objective_reached is False):
@@ -62,7 +61,7 @@ if __name__ == '__main__':
             
             if p == best_param_over_dim and is_first_round:
                 
-                is_first_round = False
+                is_first_round = True
                 continue
             
             # assign the new paramater and check if this configuration optimizes the F1-score
@@ -70,11 +69,11 @@ if __name__ == '__main__':
             new_params[opt_dim] = p
             
             print("\n")
-            print("Starting optimization over dimension: ", opt_dim)
-            print("Starting optimization with parameters: ", new_params)
-            print("Vector of parameters that will be tried for optmization: ", PARAMETERS[opt_dim])
-            print("Parameter, from previous vector, considered at this iteration: [", p, "]")
-            print("Previous best results (precision, recall, sMAPE) ", total_precision, total_recall, total_sMAPE)
+            print("Starting optimization over dim ", opt_dim)
+            print("Starting parameters ", new_params)
+            print("Vector of optmization parameters ", PARAMETERS[opt_dim])
+            print("Parameter considered at this iteration: [", p, "]")
+            print("Previous best results (precision, recall) ", total_precision, total_recall)
             print("\n")
             
             if new_params[1] == 'half':
@@ -87,7 +86,6 @@ if __name__ == '__main__':
         
             total_precision = 0.
             total_recall = 0.            
-            total_sMAPE = 0.
             n_successful_exp = 0
             n_ignored_experiments = 0
         
@@ -96,15 +94,14 @@ if __name__ == '__main__':
                 try:
                     
                     # optimize with the new parameters
-                    tp, tr, ts = lstm_experiments.lstm_experiment(data_path, *new_params)
+                    tp, tr = vae_experiments.vae_experiment(data_path, *new_params)
                     total_precision += tp
                     total_recall += tr
-                    total_sMAPE += ts
                     n_successful_exp += 1
                 
                 except ZeroDivisionError:
                     
-                    print("\n Experiment n°", i," will be ignored!")
+                    print("\n Experiment n° ", i," will be ignored!")
                     n_ignored_experiments += 1
                     pass
          
@@ -112,12 +109,10 @@ if __name__ == '__main__':
                 
                 total_precision /= n_successful_exp
                 total_recall /= n_successful_exp
-                total_sMAPE /= n_successful_exp
                 
-                if target_score(total_precision, total_recall) and (n_successful_exp >= min_total_exp):
+                if target_score(total_precision, total_recall):
                     
                     objective_reached = True
-                    initial_params = new_params.copy()
                     break
                 
                 # prevent numerical errors with precision and recall
@@ -134,6 +129,7 @@ if __name__ == '__main__':
                 if actual_f1 > prev_best_f1:
                     
                     initial_params[opt_dim] = p
+                    best_param_over_dim = p
                     prev_best_f1 = actual_f1  
             
             except:
@@ -144,11 +140,9 @@ if __name__ == '__main__':
     ## Print out results
     print(n_ignored_experiments, " out of ", total_exp, " experiments has been ignored due to division error!")
     print(n_successful_exp, " experiments successfully executed.\nParameters of the model are:\n")
-    print("- window: ", initial_params[0])
-    print("- stride: ", initial_params[1])
-    print("- batch: ", initial_params[2])
-    print("- lstm params: ", initial_params[3])
-    print("- threshold: ", initial_params[4])
-    print("- learning rate: ", initial_params[5])
-    print("Error rate (sMAPE) is: ", total_sMAPE)
+    print("- window: ", new_params[0])
+    print("- stride: ", new_params[1])
+    print("- batch: ", new_params[2])
+    print("- threshold: ", new_params[3])
+    print("- learning rate: ", new_params[4])
     print("Precision and recall of the model are: ", (total_precision, total_recall))

@@ -21,13 +21,13 @@ if __name__ == '__main__':
 
     DATA_PATH = '../../data/space_shuttle_marotta_valve.csv'
     
-    window = 10
+    window = 15
     stride = 1
-    batch_size = 10
-    sigma_threshold = 5e-3  # n-th percentile, used for double tail test
-    l_rate = 5e-3
+    batch_size = 20
+    sigma_threshold = 1e-3  # n-th percentile, used for double tail test
+    l_rate = 1e-4
     
-    lstm_params = [80]
+    lstm_params = [40]
     lstm_activation = [tf.nn.tanh]
     non_train_percentage = 0.5
     training_epochs = 250
@@ -90,7 +90,6 @@ if __name__ == '__main__':
     plot_y = np.concatenate(results['Y']).ravel()
     plot_y_hat = np.concatenate(results['Y_HAT']).ravel()
     
-    """
     fig, ax1 = plt.subplots()
 
     # plot data series
@@ -145,7 +144,6 @@ if __name__ == '__main__':
     # errors on test
     print("\nTest errors:")
     plt.hist(np.array(results['Test_Errors']).ravel(), bins=30) 
-    """
 
     # performances
     target_anomalies = np.zeros(shape=int(np.floor(plot_y.shape[0] / batch_size))*batch_size)
@@ -168,11 +166,10 @@ if __name__ == '__main__':
     precision = len(np.intersect1d(condition_positive, predicted_positive))/len(predicted_positive)
     recall = len(np.intersect1d(condition_positive, predicted_positive))/len(condition_positive)
     
-    """
+    
     print("Anomalies: ", condition_positive.T)
     print("Anomalies Detected: ", predicted_positive.T)
     print("Precision: ", precision)
-    print("Fallout: ", fall_out)
     print("Recall: ", recall)   
     
     # top-n distributions that fit the test errors.
@@ -187,17 +184,17 @@ if __name__ == '__main__':
         file_ptr = np.append(file_ptr, top_n_distr[i]['NAME'])
     
     np.savetxt('../../__tmp/__tmp_res.csv', file_ptr, fmt='%s')
-    """
+    
     
     # save sMAPE of each model
     sMAPE_error_len = len(np.array(results['Test_Errors']).ravel())
     sMAPE_den = np.abs(np.array(results['Y_HAT']).ravel()[:sMAPE_error_len])+np.abs(np.array(results['Y_test']).ravel()[:sMAPE_error_len])
     perc_error = np.mean(200*(np.abs(np.array(results['Test_Errors']).ravel()[:sMAPE_error_len]))/sMAPE_den)
     
-    """
+    
     print("Percentage error: ", perc_error)
     
     file_ptr = np.loadtxt('../../__tmp/__tmp_err.csv', dtype=object)
     file_ptr = np.append(file_ptr, str(perc_error))
     np.savetxt('../../__tmp/__tmp_err.csv', file_ptr, fmt='%s')
-    """
+    

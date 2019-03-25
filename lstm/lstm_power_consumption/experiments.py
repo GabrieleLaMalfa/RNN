@@ -20,15 +20,15 @@ import best_fit_distribution as bfd
 if __name__ == '__main__':
 
     DATA_PATH = '../../data/power_consumption.csv'
-    window = 5
-    stride = 2
-    batch_size = 10
-    lstm_params = [50]
-    lstm_activation = [tf.nn.sigmoid]
-    l_rate = 1e-3
-    non_train_percentage = 0.3
-    training_epochs = 5
-    val_rel_percentage = .8
+    window = 15
+    stride = 1
+    batch_size = 20
+    lstm_params = [60]
+    lstm_activation = [tf.nn.tanh]
+    l_rate = 1e-4
+    non_train_percentage = 0.5
+    training_epochs = 250
+    val_rel_percentage = .5
     normalize = 'maxmin01'
     time_difference = False
     td_method = None
@@ -61,7 +61,7 @@ if __name__ == '__main__':
     best_fitting_distr = eval(best_fitting)(*fitting_params)   # 'non ne EVALe la pena' (italians only)
     
     # anomaly detection
-    sigma_threshold = .005  # n-th percentile, used for double tail test
+    sigma_threshold = 5e-3  # n-th percentile, used for double tail test
     anomaly_threshold = (best_fitting_distr.ppf(sigma_threshold),
                          best_fitting_distr.ppf(1.-sigma_threshold))
 
