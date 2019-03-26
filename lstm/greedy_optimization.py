@@ -20,16 +20,15 @@ if __name__ == '__main__':
     min_total_exp = 10  # number of experiments that cannot fail
     
     # define the optimization parameters' space
-    WINDOW = [2, 3, 5, 10, 15]
-    STRIDE = [1, 'half', 'window']
-    BATCH = [3, 5, 7, 10, 15]
-    LSTM_PARAMS = [50, 80]
-    THRESHOLD = [5e-3, 1e-2, 5e-2]
-    L_RATE = [5e-4, 1e-3]
-    ACTIVATION = [tf.nn.leaky_relu, tf.nn.tanh, tf.nn.sigmoid]
+    WINDOW = [15, 20, 25, 30, 35]
+    STRIDE = [1, 5]
+    BATCH = [2, 3, 5, 7]
+    LSTM_PARAMS = [[35, 35], [64, 64]]
+    L_RATE = [1e-3]
+    ACTIVATION = [[tf.nn.relu, tf.nn.relu], [tf.nn.leaky_relu, tf.nn.leaky_relu]]
     NORMALIZATION = ['maxmin01', 'maxmin-11']
     
-    PARAMETERS = [WINDOW, STRIDE, BATCH, LSTM_PARAMS, THRESHOLD, L_RATE, ACTIVATION, NORMALIZATION]
+    PARAMETERS = [WINDOW, STRIDE, BATCH, LSTM_PARAMS, L_RATE, ACTIVATION, NORMALIZATION]
     
     # collect initial random (and best so far..) parameters
     params_seed = [np.random.randint(0, len(p)) for p in PARAMETERS]
@@ -50,7 +49,7 @@ if __name__ == '__main__':
     prev_best_f1 = 0.
     
     is_not_first_round = False  # optimize all the params in the row, if this is the very first attempt
-    target_score = lambda p, r: (p >= .7 and r >= .1)
+    target_score = lambda p, r: (p >= .6 and r >= .15)
     objective_reached = target_score(total_precision, total_recall)
       
     while (objective_reached is False):
@@ -173,7 +172,6 @@ if __name__ == '__main__':
     print("- stride: ", initial_params[1])
     print("- batch: ", initial_params[2])
     print("- lstm params: ", initial_params[3])
-    print("- threshold: ", initial_params[4])
-    print("- learning rate: ", initial_params[5])
+    print("- learning rate: ", initial_params[4])
     print("Error rate (sMAPE) is: ", total_sMAPE)
     print("Precision and recall of the model are: ", (total_precision, total_recall))

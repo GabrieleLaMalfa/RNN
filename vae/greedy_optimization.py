@@ -6,7 +6,10 @@ Created on Sat Mar 23 14:41:35 2019
 """
 
 import numpy as np
+import tensorflow as tf
+import sys
 
+sys.path.append('../')
 import experiments as vae_experiments
 
 if __name__ == '__main__':
@@ -15,18 +18,18 @@ if __name__ == '__main__':
     data_path = '../data/space_shuttle_marotta_valve.csv'
     
     # experiments per optimization's round
-    total_exp = 1
+    total_exp = 2
     
     # define the optimization parameters' space
-    SEQUENCE_LEN = [15, 20, 25, 35, 50]
-    STRIDE = [1, 'half', 'window']
-    BATCH = [1]
-    VAE_HIDDEN_SIZE = [2, 3, 4, 5, 10]
-    TSTUD_DEG = [2., 2.5, 3., 4., 5., 7., 10.]
-    SIGMA_THRESHOLD = [1e-3, 3e-3, 5e-3, 1e-2]
-    L_RATE_ELBO = [1e-3, 5e-3]
+    SEQUENCE_LEN = [25, 35, 50]
+    STRIDE = [1]
+    ACTIVATION = [tf.nn.relu, tf.nn.relu, tf.nn.tanh]
+    VAE_HIDDEN_SIZE = [5, 7, 10, 15]
+    TSTUD_DEG = [5., 7., 10.]
+    L_RATE_ELBO = [1e-4, 5e-5]
+    NORMALIZAITON = ['maxmin-11']
     
-    PARAMETERS = [SEQUENCE_LEN, STRIDE, BATCH, VAE_HIDDEN_SIZE, TSTUD_DEG, SIGMA_THRESHOLD, L_RATE_ELBO]
+    PARAMETERS = [SEQUENCE_LEN, STRIDE, ACTIVATION, VAE_HIDDEN_SIZE, TSTUD_DEG, L_RATE_ELBO, NORMALIZAITON]
     
     # collect initial random (and best so far..) parameters
     params_seed = [np.random.randint(0, len(p)) for p in PARAMETERS]
@@ -45,11 +48,16 @@ if __name__ == '__main__':
     total_recall = 0.
     prev_best_f1 = 0.
     
-    is_first_round = True  # optimize all the params in the row, if this is the very first attempt
-    target_score = lambda p, r: (p > .6 and r > .2)
+    is_not_first_round = False  # optimize all the params in the row, if this is the very first attempt
+    target_score = lambda p, r: (p > .5)
     objective_reached = target_score(total_precision, total_recall)
       
     while (objective_reached is False):
+    
+        print("###########################")
+        print("Best model has those parameters: ", initial_params)
+        print("Precision and recall are: ", (total_precision, total_recall))
+        print("###########################")
     
         # choose a random dimension and optimize over it
         opt_dim = np.random.randint(0, len(PARAMETERS))
@@ -59,10 +67,16 @@ if __name__ == '__main__':
                 
         for p in PARAMETERS[opt_dim]:
             
-            if p == best_param_over_dim and is_first_round:
+            # skip optimization on the same parameters (except for the first round)
+            if p == best_param_over_dim:
                 
-                is_first_round = True
-                continue
+                if is_not_first_round:
+                
+                    continue  
+                
+                else:
+                    
+                    is_not_first_round = True
             
             # assign the new paramater and check if this configuration optimizes the F1-score
             new_params = initial_params.copy()
@@ -123,14 +137,12 @@ if __name__ == '__main__':
                 if total_recall == 0.:
                     
                     total_recall = 1e-5
-                    
+                     
                 actual_f1 = 2*(total_precision * total_recall)/(total_precision + total_recall)
-                
                 if actual_f1 > prev_best_f1:
                     
                     initial_params[opt_dim] = p
-                    best_param_over_dim = p
-                    prev_best_f1 = actual_f1  
+                    prev_best_f1 = actual_f1 
             
             except:
                 
@@ -142,7 +154,10 @@ if __name__ == '__main__':
     print(n_successful_exp, " experiments successfully executed.\nParameters of the model are:\n")
     print("- window: ", new_params[0])
     print("- stride: ", new_params[1])
-    print("- batch: ", new_params[2])
-    print("- threshold: ", new_params[3])
-    print("- learning rate: ", new_params[4])
+    print("- activation: ", new_params[2])
+    print("- vae hidden size: ", new_params[3])
+    print("- hidden distr. degrees of freedom: ", new_params[4])
+    print("- threshold: ", new_params[5])
+    print("- learning rate: ", new_params[6])
+    print("- normalization: ", new_params[7])
     print("Precision and recall of the model are: ", (total_precision, total_recall))

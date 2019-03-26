@@ -8,7 +8,6 @@ Created on Sat Nov 24 15:27:05 2018
 import numpy as np
 import scipy.stats as scistats  # ignore eventual warning, it is used (badly)
 import sys as sys
-import tensorflow as tf
 
 sys.path.append('../utils')
 import utils_dataset as LSTM_exp
@@ -20,13 +19,12 @@ def lstm_experiment(data_path,
                     stride,
                     batch_size,
                     lstm_params,
-                    sigma_threshold,
                     l_rate,
-                    activation,
+                    lstm_activation,
                     normalization):
     
-    lstm_params = [lstm_params]
-    lstm_activation = [activation]
+    # optimize over this vector the F1-score
+    sigma_threshold = [5e-4, 1e-3, 5e-3, 7.5e-3, 1e-2]
     non_train_percentage = 0.5
     training_epochs = 250
     val_rel_percentage = .5
@@ -62,50 +60,82 @@ def lstm_experiment(data_path,
     
     best_fitting_distr = eval(best_fitting)(*fitting_params)   # 'non ne EVALe la pena' (italians only)
     
-    # anomaly detection
-    anomaly_threshold = (best_fitting_distr.ppf(sigma_threshold),
-                         best_fitting_distr.ppf(1.-sigma_threshold))
-
-    # turn test errors into a numpy array
-    test_errors = np.concatenate(results['Test_Errors']).ravel()
-
-    list_anomalies = list()
+    best_precision = best_recall = .0
+    best_sMAPE = 200.
     
-    for i in range(len(test_errors)):
-
-        tmp = best_fitting_distr.cdf(test_errors[i])
-        tmp = best_fitting_distr.ppf(tmp)
-
-        # don't consider the last samples as anomalies since the logarithm as 
-        #  time_difference method may 'corrupt' them (and there are NO anomalies there)
-        if (tmp <= anomaly_threshold[0] or tmp >= anomaly_threshold[1]) and i<len(test_errors)-15:
-
-            list_anomalies.append(i)
-
+    for t in sigma_threshold:
+        
+        # anomaly detection
+        anomaly_threshold = (best_fitting_distr.ppf(t),
+                             best_fitting_distr.ppf(1.-t))
     
-    # plot results
-    plot_y = np.concatenate(results['Y']).ravel()
-
-    # performances
-    target_anomalies = np.zeros(shape=int(np.floor(plot_y.shape[0] / batch_size))*batch_size)
+        # turn test errors into a numpy array
+        test_errors = np.concatenate(results['Test_Errors']).ravel()
     
-    # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
-    # train 50%, validation_relative 50%
-    target_anomalies[500:600] = 1
+        list_anomalies = list()
+        
+        for i in range(len(test_errors)):
     
-    # real values
-    condition_positive = np.argwhere(target_anomalies == 1)
+            tmp = best_fitting_distr.cdf(test_errors[i])
+            tmp = best_fitting_distr.ppf(tmp)
     
-    # predictions
-    predicted_positive = np.array([list_anomalies]).T
+            # don't consider the last samples as anomalies since the logarithm as 
+            #  time_difference method may 'corrupt' them (and there are NO anomalies there)
+            if (tmp <= anomaly_threshold[0] or tmp >= anomaly_threshold[1]) and i<len(test_errors)-15:
     
-    # precision and recall
-    precision = len(np.intersect1d(condition_positive, predicted_positive))/len(predicted_positive)
-    recall = len(np.intersect1d(condition_positive, predicted_positive))/len(condition_positive)
+                list_anomalies.append(i)
     
-    # save sMAPE of each model
-    sMAPE_error_len = len(np.array(results['Test_Errors']).ravel())
-    sMAPE_den = np.abs(np.array(results['Y_HAT']).ravel()[:sMAPE_error_len])+np.abs(np.array(results['Y_test']).ravel()[:sMAPE_error_len])
-    perc_error = np.mean(200*(np.abs(np.array(results['Test_Errors']).ravel()[:sMAPE_error_len]))/sMAPE_den)
+        
+        # plot results
+        plot_y = np.concatenate(results['Y']).ravel()
     
-    return precision, recall, perc_error
+        # performances
+        target_anomalies = np.zeros(shape=int(np.floor(plot_y.shape[0] / batch_size))*batch_size)
+        
+        # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
+        # train 50%, validation_relative 50%
+        target_anomalies[500:600] = 1
+        
+        # real values
+        condition_positive = np.argwhere(target_anomalies == 1)
+        
+        # predictions
+        predicted_positive = np.array([list_anomalies]).T
+        
+        # precision and recall
+        try:
+            
+            precision = len(np.intersect1d(condition_positive, predicted_positive))/len(predicted_positive)
+            recall = len(np.intersect1d(condition_positive, predicted_positive))/len(condition_positive)
+        
+        except ZeroDivisionError:
+            
+            precision = recall = .0
+        
+        if precision != .0 or recall != .0:
+            
+            actual_f1 = 2*(precision * recall)/(precision + recall)
+        
+        else:
+            
+            actual_f1 = .0
+            
+        if best_precision == .0 or best_recall == .0:
+            
+            prev_f1 = .0
+        
+        else:
+            
+            prev_f1 = 2*(best_precision * best_recall)/(best_precision + best_recall)                
+        
+        if actual_f1 > prev_f1:
+            
+            # save sMAPE of the best-so-far model
+            sMAPE_error_len = len(np.array(results['Test_Errors']).ravel())
+            sMAPE_den = np.abs(np.array(results['Y_HAT']).ravel()[:sMAPE_error_len])+np.abs(np.array(results['Y_test']).ravel()[:sMAPE_error_len])
+            best_sMAPE = np.mean(200*(np.abs(np.array(results['Test_Errors']).ravel()[:sMAPE_error_len]))/sMAPE_den)
+            
+            best_precision = precision
+            best_recall = recall
+            
+    return precision, recall, best_sMAPE

@@ -21,18 +21,18 @@ if __name__ == '__main__':
 
     DATA_PATH = '../../data/space_shuttle_marotta_valve.csv'
     
-    window = 15
-    stride = 3
-    batch_size = 10
-    sigma_threshold = 0.002  # n-th percentile, used for double tail test
-    l_rate = 2e-4
+    window = 20
+    stride = 1
+    batch_size = 5
+    sigma_threshold = 0.001  # n-th percentile, used for double tail test
+    l_rate = 1e-3
     
-    lstm_params = [100]
-    lstm_activation = [tf.nn.tanh]
+    lstm_params = [64, 64]
+    lstm_activation = [tf.nn.relu, tf.nn.relu]
     non_train_percentage = 0.5
     training_epochs = 250
     val_rel_percentage = .5
-    normalize = 'maxmin01'
+    normalize = 'maxmin-11'
     time_difference = False
     td_method = None
     stop_on_growing_error = True
