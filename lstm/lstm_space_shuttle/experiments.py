@@ -7,7 +7,6 @@ Created on Sat Nov 24 15:27:05 2018
 
 import numpy as np
 import matplotlib.pyplot as plt
-import pandas as pd
 import scipy.stats as scistats  # ignore eventual warning, it is used (badly)
 import sys as sys
 import tensorflow as tf
@@ -24,11 +23,13 @@ if __name__ == '__main__':
     window = 20
     stride = 1
     batch_size = 5
-    sigma_threshold = 0.001  # n-th percentile, used for double tail test
-    l_rate = 1e-3
+    l_rate = 1e-4        
+    lstm_params = [100]
+    lstm_activation = [tf.nn.leaky_relu]
     
-    lstm_params = [64, 64]
-    lstm_activation = [tf.nn.relu, tf.nn.relu]
+    # optimize over this vector the precision or F1-score
+    sigma_threshold = [i*1e-4 for i in range(1, 100, 5)]
+
     non_train_percentage = 0.5
     training_epochs = 250
     val_rel_percentage = .5
@@ -63,32 +64,69 @@ if __name__ == '__main__':
     
     best_fitting_distr = eval(best_fitting)(*fitting_params)   # 'non ne EVALe la pena' (italians only)
     
-    # anomaly detection
-    anomaly_threshold = (best_fitting_distr.ppf(sigma_threshold),
-                         best_fitting_distr.ppf(1.-sigma_threshold))
-
-    # turn test errors into a numpy array
-    test_errors = np.concatenate(results['Test_Errors']).ravel()
-
-    print("Anomalies detected with threshold: ", anomaly_threshold)
-    list_anomalies = list()
-    
-    for i in range(len(test_errors)):
-
-        tmp = best_fitting_distr.cdf(test_errors[i])
-        tmp = best_fitting_distr.ppf(tmp)
-
-        # don't consider the last samples as anomalies since the logarithm as 
-        #  time_difference method may 'corrupt' them (and there are NO anomalies there)
-        if (tmp <= anomaly_threshold[0] or tmp >= anomaly_threshold[1]) and i<len(test_errors)-15:
-
-            print("\tPoint number ", i, " is an anomaly: P(x) is ", best_fitting_distr.cdf(tmp))
-            list_anomalies.append(i)
-
-    
-    # plot results
+    # define data for anomaly detection and plot
     plot_y = np.concatenate(results['Y']).ravel()
     plot_y_hat = np.concatenate(results['Y_HAT']).ravel()
+    
+    best_precision = best_recall = .0
+    
+    for t in sigma_threshold:
+        
+        # anomaly detection
+        anomaly_threshold = (best_fitting_distr.ppf(t),
+                             best_fitting_distr.ppf(1.-t))
+    
+        # turn test errors into a numpy array
+        test_errors = np.concatenate(results['Test_Errors']).ravel()
+    
+        print("\nAnomalies detected with threshold: ", t)
+        list_anomalies = list()
+        
+        for i in range(len(test_errors)):
+    
+            tmp = best_fitting_distr.cdf(test_errors[i])
+            tmp = best_fitting_distr.ppf(tmp)
+    
+            # don't consider the last samples as anomalies since the logarithm as 
+            #  time_difference method may 'corrupt' them (and there are NO anomalies there)
+            if (tmp <= anomaly_threshold[0] or tmp >= anomaly_threshold[1]) and i<len(test_errors)-15:
+    
+                print("\tPoint number ", i, " is an anomaly: P(x) is ", best_fitting_distr.cdf(tmp))
+                list_anomalies.append(i)
+                
+        # performances
+        target_anomalies = np.zeros(shape=int(np.floor(plot_y.shape[0] / batch_size))*batch_size)
+        
+        # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
+        # train 50%, validation_relative 50%
+        target_anomalies[500:600] = 1
+        
+        # real values
+        condition_positive = np.argwhere(target_anomalies == 1)
+        condition_negative = np.argwhere(target_anomalies == 0)
+        
+        # predictions
+        predicted_positive = np.array([list_anomalies]).T
+        predicted_negative = np.setdiff1d(np.array([i for i in range(len(target_anomalies))]), 
+                                          predicted_positive,
+                                          assume_unique=True)
+        
+        # optimize precision wrt the thresholds
+        try:
+
+            precision = len(np.intersect1d(condition_positive, predicted_positive))/len(predicted_positive)
+            recall = len(np.intersect1d(condition_positive, predicted_positive))/len(condition_positive)
+        
+        except ZeroDivisionError:
+            
+            precision = recall = 1e-5
+        
+        print("Precision and recall for threshold ", t, " are: ", (precision, recall), "\n")
+        
+        if precision > best_precision:
+            
+            best_precision = precision
+            best_recall = recall
     
     fig, ax1 = plt.subplots()
 
@@ -143,58 +181,16 @@ if __name__ == '__main__':
     
     # errors on test
     print("\nTest errors:")
-    plt.hist(np.array(results['Test_Errors']).ravel(), bins=30) 
-
-    # performances
-    target_anomalies = np.zeros(shape=int(np.floor(plot_y.shape[0] / batch_size))*batch_size)
-    
-    # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
-    # train 50%, validation_relative 50%
-    target_anomalies[500:600] = 1
-    
-    # real values
-    condition_positive = np.argwhere(target_anomalies == 1)
-    condition_negative = np.argwhere(target_anomalies == 0)
-    
-    # predictions
-    predicted_positive = np.array([list_anomalies]).T
-    predicted_negative = np.setdiff1d(np.array([i for i in range(len(target_anomalies))]), 
-                                      predicted_positive,
-                                      assume_unique=True)
-    
-    # precision and recall
-    precision = len(np.intersect1d(condition_positive, predicted_positive))/len(predicted_positive)
-    recall = len(np.intersect1d(condition_positive, predicted_positive))/len(condition_positive)
-    
+    plt.hist(np.array(results['Test_Errors']).ravel(), bins=30)     
     
     print("Anomalies: ", condition_positive.T)
     print("Anomalies Detected: ", predicted_positive.T)
-    print("Precision: ", precision)
-    print("Recall: ", recall)   
-    
-    # top-n distributions that fit the test errors.
-    top_n = 10
-    cols = [col for col in bfd.best_fit_distribution(np.array(results['Test_Errors']).ravel(), top_n=top_n)]
-    top_n_distr = pd.DataFrame(cols, index=['NAME', 'PARAMS', 'ERRORS'])
-    print("\n\nTop distributions: NAME ERRORS PARAM ", top_n_distr)
-    
-    file_ptr = np.loadtxt('../../__tmp/__tmp_res.csv', dtype=object)
-    for i in range(top_n):
-        
-        file_ptr = np.append(file_ptr, top_n_distr[i]['NAME'])
-    
-    np.savetxt('../../__tmp/__tmp_res.csv', file_ptr, fmt='%s')
-    
+    print("Precision: ", best_precision)
+    print("Recall: ", best_recall)      
     
     # save sMAPE of each model
     sMAPE_error_len = len(np.array(results['Test_Errors']).ravel())
     sMAPE_den = np.abs(np.array(results['Y_HAT']).ravel()[:sMAPE_error_len])+np.abs(np.array(results['Y_test']).ravel()[:sMAPE_error_len])
     perc_error = np.mean(200*(np.abs(np.array(results['Test_Errors']).ravel()[:sMAPE_error_len]))/sMAPE_den)
     
-    
     print("Percentage error: ", perc_error)
-    
-    file_ptr = np.loadtxt('../../__tmp/__tmp_err.csv', dtype=object)
-    file_ptr = np.append(file_ptr, str(perc_error))
-    np.savetxt('../../__tmp/__tmp_err.csv', file_ptr, fmt='%s')
-    

@@ -21,11 +21,11 @@ if __name__ == '__main__':
     
     # define the optimization parameters' space
     WINDOW = [15, 20, 25, 30, 35]
-    STRIDE = [1, 5]
-    BATCH = [2, 3, 5, 7]
-    LSTM_PARAMS = [[35, 35], [64, 64]]
-    L_RATE = [1e-3]
-    ACTIVATION = [[tf.nn.relu, tf.nn.relu], [tf.nn.leaky_relu, tf.nn.leaky_relu]]
+    STRIDE = [1, 5, 10]
+    BATCH = [2, 3, 5, 10]
+    LSTM_PARAMS = [[35], [64], [100]]
+    L_RATE = [5e-4, 1e-3, 5e-3]
+    ACTIVATION = [[tf.nn.leaky_relu]]
     NORMALIZATION = ['maxmin01', 'maxmin-11']
     
     PARAMETERS = [WINDOW, STRIDE, BATCH, LSTM_PARAMS, L_RATE, ACTIVATION, NORMALIZATION]
