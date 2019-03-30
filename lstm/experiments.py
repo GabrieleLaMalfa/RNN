@@ -23,8 +23,8 @@ def lstm_experiment(data_path,
                     lstm_activation,
                     normalization):
     
-    # optimize over this vector the F1-score
-    sigma_threshold = [5e-4, 1e-3, 5e-3, 7.5e-3, 1e-2]
+    # optimize over this vector the precision or F1-score
+    sigma_threshold = [1e-5, 5e-5, 1e-4, 2e-4, 5e-4, 1e-3]
     non_train_percentage = 0.5
     training_epochs = 250
     val_rel_percentage = .5
@@ -62,6 +62,7 @@ def lstm_experiment(data_path,
     
     best_precision = best_recall = .0
     best_sMAPE = 200.
+    best_threshold = .0
     
     for t in sigma_threshold:
         
@@ -111,25 +112,9 @@ def lstm_experiment(data_path,
         except ZeroDivisionError:
             
             precision = recall = .0
-        
-        if precision != .0 or recall != .0:
-            
-            actual_f1 = 2*(precision * recall)/(precision + recall)
-        
-        else:
-            
-            actual_f1 = .0
-            
-        if best_precision == .0 or best_recall == .0:
-            
-            prev_f1 = .0
-        
-        else:
-            
-            prev_f1 = 2*(best_precision * best_recall)/(best_precision + best_recall)                
-        
-        if actual_f1 > prev_f1:
-            
+                    
+        if precision > best_precision:
+                       
             # save sMAPE of the best-so-far model
             sMAPE_error_len = len(np.array(results['Test_Errors']).ravel())
             sMAPE_den = np.abs(np.array(results['Y_HAT']).ravel()[:sMAPE_error_len])+np.abs(np.array(results['Y_test']).ravel()[:sMAPE_error_len])
@@ -137,5 +122,6 @@ def lstm_experiment(data_path,
             
             best_precision = precision
             best_recall = recall
-            
-    return precision, recall, best_sMAPE
+            best_threshold = t
+    
+    return best_precision, best_recall, best_sMAPE, best_threshold

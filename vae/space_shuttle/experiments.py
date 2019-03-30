@@ -5,6 +5,7 @@ Created on Sun Feb 10 09:36:16 2019
 @author: Emanuele
 """
 
+import copy as cp
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats as scistats
@@ -20,11 +21,14 @@ if __name__ == '__main__':
     
     # parameters of the model
     data_path = '../../data/space_shuttle_marotta_valve.csv'
-    sequence_len = 35
+    sequence_len = 75
     stride = 1
-    vae_hidden_size = 4
-    tstud_degrees_of_freedom = 10.
-    sigma_threshold_elbo = 1e-2
+    vae_hidden_size = 2
+    tstud_degrees_of_freedom = 150.
+    
+    # maximize precision or F1-score over this vector
+    sigma_threshold_elbo = [1e-5, 2e-5, 5e-5, 1e-4, 2e-4, 5e-4, 1e-3]
+    
     learning_rate_elbo = 1e-5
     vae_activation = tf.nn.leaky_relu
     normalization = 'maxmin-11'
@@ -86,7 +90,7 @@ if __name__ == '__main__':
     vae_hidden_state = tf.reduce_mean([vae_hidden_distr.sample() for _ in range(samples_per_iter)], axis=0)
     
     # get probability of the hidden state
-    s = vae_hidden_distr.sample(10000)
+    s = vae_hidden_distr.sample(int(100e4))
     in_box = tf.cast(tf.reduce_all(s <= vae_hidden_state, axis=-1), vae_hidden_distr.dtype)
     vae_hidden_prob = tf.reduce_mean(in_box, axis=0) 
         
@@ -196,44 +200,70 @@ if __name__ == '__main__':
             
         # anomaly detection on test set
         y_test = y_test[:x_test.shape[0]]
-        vae_anomalies = []
         
-        threshold_elbo = (sigma_threshold_elbo,
-                          1.-sigma_threshold_elbo)
+        # find the thershold that maximizes the F1-score
+        best_precision = best_recall = best_threshold = .0
+        best_predicted_positive = []
         
-        iter_ = 0
-        p_anom = np.zeros(shape=(int(np.floor(x_test.shape[0] / batch_size)),))
-        
-        print("Starting prediction of anomalies with threshold: ", threshold_elbo)
-        
-        while iter_ < int(np.floor(x_test.shape[0] / batch_size)):
+        for t in sigma_threshold_elbo:
             
-            batch_x = x_test[iter_*batch_size: (iter_+1)*batch_size, :].T.reshape(1, sequence_len, batch_size)
-                        
-            # get probability of the encoding and a boolean (anomaly or not)        
-            p_anom[iter_] = sess.run(vae_hidden_prob, feed_dict={input_: batch_x})  
-            #print("Sequence ", iter_, " likelihood: ", p_anom[iter_])
+            print("Optimizing with threshold's value: ", t)
             
-            if (p_anom[iter_] <= threshold_elbo[0] or p_anom[iter_] >= threshold_elbo[1]):
-                                
-                for i in range(iter_*batch_size, (iter_+1)*batch_size):
+            vae_anomalies = []
+            p_anom = np.zeros(shape=(int(np.floor(x_test.shape[0] / batch_size)),))
+            threshold_elbo = (t, 1.-t)            
+            iter_ = 0
+            
+            while iter_ < int(np.floor(x_test.shape[0] / batch_size)):
+        
+                batch_x = x_test[iter_*batch_size: (iter_+1)*batch_size, :].T.reshape(1, sequence_len, batch_size)
+                            
+                # get probability of the encoding and a boolean (anomaly or not)        
+                p_anom[iter_] = sess.run(vae_hidden_prob, feed_dict={input_: batch_x})  
+                
+                if (p_anom[iter_] <= threshold_elbo[0] or p_anom[iter_] >= threshold_elbo[1]):
                     
-                    vae_anomalies.append(i)
-                                       
-            iter_ +=  1
+                    for i in range(iter_*batch_size, (iter_+1)*batch_size):
+                        
+                        vae_anomalies.append(i)
+                                           
+                iter_ +=  1
+                
+            # predictions
+            predicted_positive = np.array([vae_anomalies]).T
             
-        # predictions
-        predicted_positive = np.array([vae_anomalies]).T
+            if len(vae_anomalies) == 0:
+                
+                continue
+                
+            # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
+            # train 50%, validation_relative 50%
+            # performances
+            target_anomalies = np.zeros(shape=int(np.floor(y_test.shape[0] / batch_size))*batch_size)
+            target_anomalies[500:600] = 1
+        
+            # real values
+            condition_positive = np.argwhere(target_anomalies == 1)
+        
+            # precision and recall
+            try:
+                
+                precision = len(np.intersect1d(condition_positive, predicted_positive))/len(predicted_positive)
+                recall = len(np.intersect1d(condition_positive, predicted_positive))/len(condition_positive)
             
-        # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
-        # train 50%, validation_relative 50%
-        # performances
-        target_anomalies = np.zeros(shape=int(np.floor(y_test.shape[0] / batch_size))*batch_size)
-        target_anomalies[500:600] = 1
-    
-        # real values
-        condition_positive = np.argwhere(target_anomalies == 1)
+            except ZeroDivisionError:
+                
+                precision = recall = .0
+                
+            print("Precision and recall for threshold: ", t, " is ", (precision, recall))
             
+            if precision > best_precision:
+                
+                best_threshold = t
+                best_precision = precision
+                best_recall = recall
+                best_predicted_positive = cp.copy(predicted_positive)
+                
         # plot data series    
         fig, ax1 = plt.subplots()
         
@@ -258,11 +288,8 @@ if __name__ == '__main__':
                 
         fig.tight_layout()
         plt.show()
-        
-        # precision and recall
-        precision = len(np.intersect1d(condition_positive, predicted_positive))/len(predicted_positive)
-        recall = len(np.intersect1d(condition_positive, predicted_positive))/len(condition_positive)
-        
+                
         print("Anomalies in the series:", condition_positive.T)
-        print("Anomalies detected with threshold: ", threshold_elbo)
-        print(predicted_positive.T)
+        print("Anomalies detected with threshold: ", best_threshold)
+        print(best_predicted_positive.T)
+        print("Precision and recall ", best_precision, best_recall)

@@ -21,13 +21,13 @@ if __name__ == '__main__':
     total_exp = 2
     
     # define the optimization parameters' space
-    SEQUENCE_LEN = [25, 35, 50]
+    SEQUENCE_LEN = [35, 50, 75]
     STRIDE = [1]
-    ACTIVATION = [tf.nn.relu, tf.nn.relu, tf.nn.tanh]
-    VAE_HIDDEN_SIZE = [5, 7, 10, 15]
-    TSTUD_DEG = [5., 7., 10.]
-    L_RATE_ELBO = [1e-4, 5e-5]
-    NORMALIZAITON = ['maxmin-11']
+    ACTIVATION = [tf.nn.tanh]
+    VAE_HIDDEN_SIZE = [2, 3, 5]
+    TSTUD_DEG = [100., 150., 200., 250.]
+    L_RATE_ELBO = [1e-5]
+    NORMALIZAITON = ['maxmin-11', 'maxmin01']
     
     PARAMETERS = [SEQUENCE_LEN, STRIDE, ACTIVATION, VAE_HIDDEN_SIZE, TSTUD_DEG, L_RATE_ELBO, NORMALIZAITON]
     
@@ -78,7 +78,7 @@ if __name__ == '__main__':
                     
                     is_not_first_round = True
             
-            # assign the new paramater and check if this configuration optimizes the F1-score
+            # assign the new paramater and check if this configuration optimizes the precision
             new_params = initial_params.copy()
             new_params[opt_dim] = p
             
@@ -97,20 +97,23 @@ if __name__ == '__main__':
             elif new_params[1] == 'window':
         
                 new_params[1] = new_params[0]
-        
+            
+            prev_best_precision = .0
             total_precision = 0.
             total_recall = 0.            
             n_successful_exp = 0
             n_ignored_experiments = 0
+            best_threshold = []
         
             for i in range(total_exp):
                 
                 try:
                     
                     # optimize with the new parameters
-                    tp, tr = vae_experiments.vae_experiment(data_path, *new_params)
+                    tp, tr, b_tr =  vae_experiments.vae_experiment(data_path, *new_params)
                     total_precision += tp
                     total_recall += tr
+                    best_threshold.append(b_tr)
                     n_successful_exp += 1
                 
                 except ZeroDivisionError:
@@ -139,10 +142,11 @@ if __name__ == '__main__':
                     total_recall = 1e-5
                      
                 actual_f1 = 2*(total_precision * total_recall)/(total_precision + total_recall)
-                if actual_f1 > prev_best_f1:
+                if total_precision > prev_best_precision:
                     
                     initial_params[opt_dim] = p
-                    prev_best_f1 = actual_f1 
+                    prev_best_precision = total_precision 
+                    prev_best_f1 = actual_f1
             
             except:
                 
@@ -157,7 +161,7 @@ if __name__ == '__main__':
     print("- activation: ", new_params[2])
     print("- vae hidden size: ", new_params[3])
     print("- hidden distr. degrees of freedom: ", new_params[4])
-    print("- threshold: ", new_params[5])
-    print("- learning rate: ", new_params[6])
-    print("- normalization: ", new_params[7])
+    print("- threshold: ", best_threshold)
+    print("- learning rate: ", new_params[5])
+    print("- normalization: ", new_params[6])
     print("Precision and recall of the model are: ", (total_precision, total_recall))

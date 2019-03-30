@@ -49,7 +49,7 @@ if __name__ == '__main__':
     prev_best_f1 = 0.
     
     is_not_first_round = False  # optimize all the params in the row, if this is the very first attempt
-    target_score = lambda p, r: (p >= .6 and r >= .15)
+    target_score = lambda p, r: (p >= .7 and r >= .15)
     objective_reached = target_score(total_precision, total_recall)
       
     while (objective_reached is False):
@@ -98,9 +98,12 @@ if __name__ == '__main__':
             elif new_params[1] == 'window':
         
                 new_params[1] = new_params[0]
-        
-            total_precision = 0.
-            total_recall = 0.            
+                
+            # define parameters for each experiment and the overall best parameters
+            total_precision = total_recall = 0.     
+            best_precision = best_recall = .0
+            total_thresholds = []
+            best_thresholds = []
             total_sMAPE = 0.
             n_successful_exp = 0
             n_ignored_experiments = 0
@@ -115,10 +118,12 @@ if __name__ == '__main__':
                 try:
                     
                     # optimize with the new parameters
-                    tp, tr, ts = lstm_experiments.lstm_experiment(data_path, *new_params)
+                    tp, tr, ts, b_tr = lstm_experiments.lstm_experiment(data_path, *new_params)
                     total_precision += tp
                     total_recall += tr
                     total_sMAPE += ts
+                    total_thresholds.append(b_tr)
+
                     n_successful_exp += 1
                 
                 except ZeroDivisionError:
@@ -155,10 +160,14 @@ if __name__ == '__main__':
                     total_recall = 1e-5
                      
                 actual_f1 = 2*(total_precision * total_recall)/(total_precision + total_recall)
-                if actual_f1 > prev_best_f1:
+                
+                if total_precision > best_precision:
                     
                     initial_params[opt_dim] = p
                     prev_best_f1 = actual_f1 
+                    best_precision = total_precision
+                    best_recall = total_recall
+                    best_thresholds = total_thresholds.copy()
             
             except:
                 
@@ -173,5 +182,6 @@ if __name__ == '__main__':
     print("- batch: ", initial_params[2])
     print("- lstm params: ", initial_params[3])
     print("- learning rate: ", initial_params[4])
+    print("Thresholds used for each the experiment: ", total_thresholds)
     print("Error rate (sMAPE) is: ", total_sMAPE)
     print("Precision and recall of the model are: ", (total_precision, total_recall))

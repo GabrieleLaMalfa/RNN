@@ -29,8 +29,8 @@ def vae_experiment(data_path,
     # parameters that are constant
     batch_size = 1
     
-    # maximize F1-score over this vector
-    sigma_threshold_elbo = [1e-3, 5e-3, 7.5e-3, 1e-2, 5e-2, 7.5e-2]
+    # maximize precision or precision/F1-score over this vector
+    sigma_threshold_elbo = [1e-5, 5e-5, 1e-4, 2e-4, 5e-4, 1e-3]
     
     # training epochs
     epochs = 100
@@ -40,8 +40,8 @@ def vae_experiment(data_path,
     
     # early-stopping parameters
     stop_on_growing_error = True
-    stop_valid_percentage = .3  # percentage of validation used for early-stopping 
-    min_loss_improvment = .05  # percentage of minimum loss' decrease (.01 is 1%)
+    stop_valid_percentage = .1  # percentage of validation used for early-stopping 
+    min_loss_improvment = .03  # percentage of minimum loss' decrease (.01 is 1%)
     
     # define input/output pairs
     input_ = tf.placeholder(tf.float32, [None, sequence_len, batch_size])  # (batch, input, time)
@@ -83,7 +83,7 @@ def vae_experiment(data_path,
     vae_hidden_state = tf.reduce_mean([vae_hidden_distr.sample() for _ in range(samples_per_iter)], axis=0)
     
     # get probability of the hidden state
-    s = vae_hidden_distr.sample(10000)
+    s = vae_hidden_distr.sample(int(100e4))
     in_box = tf.cast(tf.reduce_all(s <= vae_hidden_state, axis=-1), vae_hidden_distr.dtype)
     vae_hidden_prob = tf.reduce_mean(in_box, axis=0) 
         
@@ -191,6 +191,7 @@ def vae_experiment(data_path,
         
         # find the thershold that maximizes the F1-score
         best_precision = best_recall = .0
+        best_threshold = .0
         
         for t in sigma_threshold_elbo:
             
@@ -218,14 +219,13 @@ def vae_experiment(data_path,
             
             if len(vae_anomalies) == 0:
                 
-                best_precision = best_recall = .0
                 continue
                 
             # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
             # train 50%, validation_relative 50%
             # performances
             target_anomalies = np.zeros(shape=int(np.floor(y_test.shape[0] / batch_size))*batch_size)
-            target_anomalies[500:600] = 1
+            target_anomalies[400:500] = 1
         
             # real values
             condition_positive = np.argwhere(target_anomalies == 1)
@@ -240,25 +240,12 @@ def vae_experiment(data_path,
                 
                 precision = recall = .0
             
-            if precision != .0 or recall != .0:
-                
-                actual_f1 = 2*(precision * recall)/(precision + recall)
+            print("Precision and recall for threshold: ", t, " is ", (precision, recall))
             
-            else:
+            if precision > best_precision:
                 
-                actual_f1 = .0
-                
-            if best_precision == .0 or best_recall == .0:
-                
-                prev_f1 = .0
-            
-            else:
-                
-                prev_f1 = 2*(best_precision * best_recall)/(best_precision + best_recall)                
-            
-            if actual_f1 > prev_f1:
-                
+                best_threshold = t
                 best_precision = precision
                 best_recall = recall
         
-        return best_precision, best_recall          
+        return best_precision, best_recall, best_threshold       
