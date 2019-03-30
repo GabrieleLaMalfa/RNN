@@ -5,6 +5,7 @@ Created on Sat Nov 24 15:27:05 2018
 @author: Emanuele
 """
 
+import copy as cp
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats as scistats  # ignore eventual warning, it is used (badly)
@@ -20,10 +21,10 @@ if __name__ == '__main__':
 
     DATA_PATH = '../../data/space_shuttle_marotta_valve.csv'
     
-    window = 20
+    window = 5
     stride = 1
-    batch_size = 5
-    l_rate = 1e-4        
+    batch_size = 20
+    l_rate = 2e-4    
     lstm_params = [100]
     lstm_activation = [tf.nn.leaky_relu]
     
@@ -127,6 +128,7 @@ if __name__ == '__main__':
             
             best_precision = precision
             best_recall = recall
+            best_predicted_positive = cp.copy(predicted_positive)
     
     fig, ax1 = plt.subplots()
 
@@ -184,7 +186,7 @@ if __name__ == '__main__':
     plt.hist(np.array(results['Test_Errors']).ravel(), bins=30)     
     
     print("Anomalies: ", condition_positive.T)
-    print("Anomalies Detected: ", predicted_positive.T)
+    print("Anomalies Detected: ", best_predicted_positive.T)
     print("Precision: ", best_precision)
     print("Recall: ", best_recall)      
     

@@ -24,7 +24,7 @@ def lstm_experiment(data_path,
                     normalization):
     
     # optimize over this vector the precision or F1-score
-    sigma_threshold = [i*1e-4 for i in range(1, 60, 5)]
+    sigma_threshold = [i*1e-4 for i in range(1, 100, 5)]
     
     non_train_percentage = 0.5
     training_epochs = 250
