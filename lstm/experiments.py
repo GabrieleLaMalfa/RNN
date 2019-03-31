@@ -114,7 +114,7 @@ def lstm_experiment(data_path,
             
             precision = recall = .0
                     
-        if precision > best_precision:
+        if precision >= best_precision:
                        
             # save sMAPE of the best-so-far model
             sMAPE_error_len = len(np.array(results['Test_Errors']).ravel())

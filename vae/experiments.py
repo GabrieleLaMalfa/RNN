@@ -47,8 +47,8 @@ def vae_experiment(data_path,
     input_ = tf.placeholder(tf.float32, [None, sequence_len, batch_size])  # (batch, input, time)
     
     # encoder/decoder parameters + initialization
-    vae_encoder_shape_weights = [batch_size*sequence_len, int(batch_size*sequence_len/2), vae_hidden_size*2]
-    vae_decoder_shape_weights = [vae_hidden_size, int(batch_size*sequence_len/2), batch_size*sequence_len]
+    vae_encoder_shape_weights = [batch_size*sequence_len, vae_hidden_size*2]
+    vae_decoder_shape_weights = [vae_hidden_size, batch_size*sequence_len]
     
     zip_weights_encoder = zip(vae_encoder_shape_weights[:-1], vae_encoder_shape_weights[1:])
     
@@ -216,10 +216,6 @@ def vae_experiment(data_path,
                 
             # predictions
             predicted_positive = np.array([vae_anomalies]).T
-            
-            if len(vae_anomalies) == 0:
-                
-                continue
                 
             # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
             # train 50%, validation_relative 50%
@@ -242,7 +238,7 @@ def vae_experiment(data_path,
             
             print("Precision and recall for threshold: ", t, " is ", (precision, recall))
             
-            if precision > best_precision:
+            if precision >= best_precision:
                 
                 best_threshold = t
                 best_precision = precision

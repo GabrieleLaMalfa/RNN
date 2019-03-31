@@ -21,12 +21,12 @@ if __name__ == '__main__':
 
     DATA_PATH = '../../data/space_shuttle_marotta_valve.csv'
     
-    window = 5
+    window = 10
     stride = 1
     batch_size = 20
-    l_rate = 2e-4    
-    lstm_params = [100]
-    lstm_activation = [tf.nn.leaky_relu]
+    l_rate = 5e-5    
+    lstm_params = [150]
+    lstm_activation = [tf.nn.tanh]
     
     # optimize over this vector the precision or F1-score
     sigma_threshold = [i*1e-4 for i in range(1, 100, 5)]
@@ -34,7 +34,7 @@ if __name__ == '__main__':
     non_train_percentage = 0.5
     training_epochs = 250
     val_rel_percentage = .5
-    normalize = 'maxmin-11'
+    normalize = 'maxmin01'
     time_difference = False
     td_method = None
     stop_on_growing_error = True
@@ -124,7 +124,7 @@ if __name__ == '__main__':
         
         print("Precision and recall for threshold ", t, " are: ", (precision, recall), "\n")
         
-        if precision > best_precision:
+        if precision >= best_precision:
             
             best_precision = precision
             best_recall = recall
@@ -166,7 +166,7 @@ if __name__ == '__main__':
         tot_y_hat += plot_y_hat[i-1] 
                 
     fig, ax1 = plt.subplots()
-
+    
     # plot data series
     print("\nReconstruction:")
     ax1.plot(recovered_plot_y, 'b', label='index')

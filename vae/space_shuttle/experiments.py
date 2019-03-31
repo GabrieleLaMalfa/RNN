@@ -47,15 +47,15 @@ if __name__ == '__main__':
     
     # early-stopping parameters
     stop_on_growing_error = True
-    stop_valid_percentage = .3  # percentage of validation used for early-stopping 
-    min_loss_improvment = .02  # percentage of minimum loss' decrease (.01 is 1%)
+    stop_valid_percentage = 1.  # percentage of validation used for early-stopping 
+    min_loss_improvment = .03  # percentage of minimum loss' decrease (.01 is 1%)
     
     # define input/output pairs
     input_ = tf.placeholder(tf.float32, [None, sequence_len, batch_size])  # (batch, input, time)
     
     # encoder/decoder parameters + initialization
-    vae_encoder_shape_weights = [batch_size*sequence_len, int(batch_size*sequence_len/2), vae_hidden_size*2]
-    vae_decoder_shape_weights = [vae_hidden_size, int(batch_size*sequence_len/2), batch_size*sequence_len]
+    vae_encoder_shape_weights = [batch_size*sequence_len, vae_hidden_size*2]
+    vae_decoder_shape_weights = [vae_hidden_size, batch_size*sequence_len]
     
     zip_weights_encoder = zip(vae_encoder_shape_weights[:-1], vae_encoder_shape_weights[1:])
     
@@ -257,7 +257,7 @@ if __name__ == '__main__':
                 
             print("Precision and recall for threshold: ", t, " is ", (precision, recall))
             
-            if precision > best_precision:
+            if precision >= best_precision:
                 
                 best_threshold = t
                 best_precision = precision
