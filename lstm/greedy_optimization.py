@@ -20,13 +20,13 @@ if __name__ == '__main__':
     min_total_exp = 10  # number of experiments that cannot fail
     
     # define the optimization parameters' space
-    WINDOW = [5]
+    WINDOW = [5, 7, 10, 12, 15]
     STRIDE = [1]
     BATCH = [15, 20, 25, 30]
-    LSTM_PARAMS = [[35], [64], [100]]
+    LSTM_PARAMS = [[150]]
     L_RATE = [2e-4]
     ACTIVATION = [[tf.nn.leaky_relu], [tf.nn.relu]]
-    NORMALIZATION = ['maxmin-11']
+    NORMALIZATION = ['maxmin-11', 'maxmin01']
     
     PARAMETERS = [WINDOW, STRIDE, BATCH, LSTM_PARAMS, L_RATE, ACTIVATION, NORMALIZATION]
     

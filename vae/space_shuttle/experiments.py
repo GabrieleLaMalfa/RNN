@@ -21,16 +21,15 @@ if __name__ == '__main__':
     
     # parameters of the model
     data_path = '../../data/space_shuttle_marotta_valve.csv'
-    sequence_len = 75
+    sequence_len = 25
     stride = 1
-    vae_hidden_size = 2
-    tstud_degrees_of_freedom = 150.
+    vae_hidden_size = 10
     
     # maximize precision or F1-score over this vector
-    sigma_threshold_elbo = [1e-5, 2e-5, 5e-5, 1e-4, 2e-4, 5e-4, 1e-3]
+    sigma_threshold_elbo = [round(i*1e-3, 5) for i in range(1, 100, 5)]
     
-    learning_rate_elbo = 1e-5
-    vae_activation = tf.nn.leaky_relu
+    learning_rate_elbo = 1e-4
+    vae_activation = tf.nn.relu
     normalization = 'maxmin-11'
     
     # reset computational graph
@@ -47,14 +46,14 @@ if __name__ == '__main__':
     
     # early-stopping parameters
     stop_on_growing_error = True
-    stop_valid_percentage = 1.  # percentage of validation used for early-stopping 
-    min_loss_improvment = .03  # percentage of minimum loss' decrease (.01 is 1%)
+    stop_valid_percentage = .3  # percentage of validation used for early-stopping 
+    min_loss_improvment = .02  # percentage of minimum loss' decrease (.01 is 1%)
     
     # define input/output pairs
     input_ = tf.placeholder(tf.float32, [None, sequence_len, batch_size])  # (batch, input, time)
     
     # encoder/decoder parameters + initialization
-    vae_encoder_shape_weights = [batch_size*sequence_len, vae_hidden_size*2]
+    vae_encoder_shape_weights = [batch_size*sequence_len, vae_hidden_size*3]
     vae_decoder_shape_weights = [vae_hidden_size, batch_size*sequence_len]
     
     zip_weights_encoder = zip(vae_encoder_shape_weights[:-1], vae_encoder_shape_weights[1:])
@@ -83,16 +82,20 @@ if __name__ == '__main__':
     loc = tf.slice(vae_activation(vae_encoder), [0, 0], [-1, vae_hidden_size])
     loc = tf.squeeze(loc, axis=0)
     scale = tf.slice(tf.nn.softplus(vae_encoder), [0, vae_hidden_size], [-1, vae_hidden_size])
-    scale = tf.squeeze(scale, 0) 
-  
+    scale = tf.squeeze(scale, 0)
+    hidden_sample = tf.slice(tf.nn.softplus(vae_encoder), [0, 2*vae_hidden_size], [-1, vae_hidden_size])
+    hidden_sample = tf.squeeze(hidden_sample, 0)
+      
     # sample from the hidden ditribution
-    vae_hidden_distr = tfp.distributions.MultivariateNormalDiag(loc, scale)  
-    vae_hidden_state = tf.reduce_mean([vae_hidden_distr.sample() for _ in range(samples_per_iter)], axis=0)
+    vae_hidden_distr = tfp.distributions.MultivariateNormalDiag(loc, scale)
+    
+    # extract each sample 'watermark' as last 'vae_hidde_size' points of the input_ itself
+    vae_hidden_state = hidden_sample
     
     # get probability of the hidden state
-    s = vae_hidden_distr.sample(int(100e4))
-    in_box = tf.cast(tf.reduce_all(s <= vae_hidden_state, axis=-1), vae_hidden_distr.dtype)
-    vae_hidden_prob = tf.reduce_mean(in_box, axis=0) 
+    s_ = vae_hidden_distr.sample(int(100e4))
+    in_box = tf.cast(tf.reduce_all(s_ <= hidden_sample, axis=-1), vae_hidden_distr.dtype)
+    vae_hidden_prob = tf.reduce_mean(in_box, axis=0)
         
     feed_decoder = tf.reshape(vae_hidden_state, shape=(-1, vae_hidden_size))
     vae_decoder = tf.matmul(feed_decoder, weights_vae_decoder[0]) + bias_vae_decoder[0]
@@ -104,13 +107,13 @@ if __name__ == '__main__':
         vae_decoder = vae_activation(vae_decoder)
     
     # time-series reconstruction and ELBO loss
-    vae_reconstruction = tfp.distributions.StudentT(tstud_degrees_of_freedom,
-                                                           tf.constant(np.zeros(batch_size*sequence_len, dtype='float32')),
-                                                           tf.constant(np.ones(batch_size*sequence_len, dtype='float32')))
+    vae_reconstruction = tfp.distributions.MultivariateNormalDiag(tf.constant(np.zeros(batch_size*sequence_len, dtype='float32')),
+                                                                  tf.constant(np.ones(batch_size*sequence_len, dtype='float32')))
+    
     likelihood = vae_reconstruction.log_prob(flattened_input)
     
     prior = tfp.distributions.MultivariateNormalDiag(tf.constant(np.zeros(vae_hidden_size, dtype='float32')),
-                                                            tf.constant(np.ones(vae_hidden_size, dtype='float32')))
+                                                     tf.constant(np.ones(vae_hidden_size, dtype='float32')))
     
     divergence = tfp.distributions.kl_divergence(vae_hidden_distr, prior)
     elbo = tf.reduce_mean(likelihood - divergence)
@@ -203,7 +206,8 @@ if __name__ == '__main__':
         
         # find the thershold that maximizes the F1-score
         best_precision = best_recall = best_threshold = .0
-        best_predicted_positive = []
+        best_predicted_positive = np.array([])
+        condition_positive = np.array([])
         
         for t in sigma_threshold_elbo:
             
@@ -221,9 +225,10 @@ if __name__ == '__main__':
                 # get probability of the encoding and a boolean (anomaly or not)        
                 p_anom[iter_] = sess.run(vae_hidden_prob, feed_dict={input_: batch_x})  
                 
+                # highlight anomalies   (the whole window is considered)                 
                 if (p_anom[iter_] <= threshold_elbo[0] or p_anom[iter_] >= threshold_elbo[1]):
                     
-                    for i in range(iter_*batch_size, (iter_+1)*batch_size):
+                    for i in range(iter_, iter_+sequence_len):
                         
                         vae_anomalies.append(i)
                                            
@@ -240,7 +245,7 @@ if __name__ == '__main__':
             # train 50%, validation_relative 50%
             # performances
             target_anomalies = np.zeros(shape=int(np.floor(y_test.shape[0] / batch_size))*batch_size)
-            target_anomalies[500:600] = 1
+            target_anomalies[510-sequence_len:610-sequence_len] = 1
         
             # real values
             condition_positive = np.argwhere(target_anomalies == 1)

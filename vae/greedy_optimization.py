@@ -21,15 +21,14 @@ if __name__ == '__main__':
     total_exp = 2
     
     # define the optimization parameters' space
-    SEQUENCE_LEN = [35, 50, 75]
+    SEQUENCE_LEN = [75, 100, 150]
     STRIDE = [1]
     ACTIVATION = [tf.nn.tanh]
     VAE_HIDDEN_SIZE = [2, 3, 5]
-    TSTUD_DEG = [100., 150., 200., 250.]
     L_RATE_ELBO = [1e-5]
     NORMALIZAITON = ['maxmin-11', 'maxmin01']
     
-    PARAMETERS = [SEQUENCE_LEN, STRIDE, ACTIVATION, VAE_HIDDEN_SIZE, TSTUD_DEG, L_RATE_ELBO, NORMALIZAITON]
+    PARAMETERS = [SEQUENCE_LEN, STRIDE, ACTIVATION, VAE_HIDDEN_SIZE, L_RATE_ELBO, NORMALIZAITON]
     
     # collect initial random (and best so far..) parameters
     params_seed = [np.random.randint(0, len(p)) for p in PARAMETERS]
