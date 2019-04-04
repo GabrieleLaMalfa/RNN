@@ -8,12 +8,12 @@ Created on Sat Mar 23 14:41:35 2019
 import numpy as np
 import tensorflow as tf
 
-import experiments as lstm_experiments
+import greedy_experiments as lstm_experiments
 
 if __name__ == '__main__':
     
     # define the target dataset
-    data_path = '../data/space_shuttle_marotta_valve.csv'
+    data_path = '../../../data/space_shuttle_marotta_valve.csv'
     
     # experiments per optimization's round
     total_exp = 20

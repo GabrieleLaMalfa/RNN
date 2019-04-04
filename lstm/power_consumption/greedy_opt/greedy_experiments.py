@@ -9,7 +9,7 @@ import numpy as np
 import scipy.stats as scistats  # ignore eventual warning, it is used (badly)
 import sys as sys
 
-sys.path.append('../utils')
+sys.path.append('../../../utils')
 import utils_dataset as LSTM_exp
 import best_fit_distribution as bfd
 
@@ -24,11 +24,11 @@ def lstm_experiment(data_path,
                     normalization):
     
     # optimize over this vector the precision or F1-score
-    sigma_threshold = [i*1e-4 for i in range(1, 100, 5)]
+    sigma_threshold = [round(i*1e-4, 5) for i in range(1, 150, 5)]
     
-    non_train_percentage = 0.5
+    non_train_percentage = 0.7
     training_epochs = 250
-    val_rel_percentage = .5
+    val_rel_percentage = .8
     normalize = normalization
     time_difference = False
     td_method = None
@@ -95,8 +95,8 @@ def lstm_experiment(data_path,
         target_anomalies = np.zeros(shape=int(np.floor(plot_y.shape[0] / batch_size))*batch_size)
         
         # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
-        # train 50%, validation_relative 50%
-        target_anomalies[500:600] = 1
+        # train 70%, validation_relative 80%
+        target_anomalies[4100:4500] = 1
         
         # real values
         condition_positive = np.argwhere(target_anomalies == 1)

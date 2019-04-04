@@ -244,7 +244,7 @@ if __name__ == '__main__':
             # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
             # train 70%, validation_relative 80%
             target_anomalies = np.zeros(shape=int(np.floor(y_test.shape[0] / batch_size))*batch_size)
-            target_anomalies[1400-sequence_len:1600-sequence_len] = 1
+            target_anomalies[4100:4400] = 1
         
             # real values
             condition_positive = np.argwhere(target_anomalies == 1)
