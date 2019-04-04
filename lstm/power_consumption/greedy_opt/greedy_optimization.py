@@ -16,17 +16,17 @@ if __name__ == '__main__':
     data_path = '../../../data/power_consumption.csv'
     
     # experiments per optimization's round
-    total_exp = 10
-    min_total_exp = 5  # number of experiments that cannot fail
+    total_exp = 2
+    min_total_exp = 1  # number of experiments that cannot fail
     
     # define the optimization parameters' space
-    WINDOW = [5, 7, 10, 12, 15]
-    STRIDE = [1, 'half', 'window']
-    BATCH = [15, 20, 25, 30, 50, 75, 100]
-    LSTM_PARAMS = [[50], [100], [150]]
-    L_RATE = [2e-4, 5e-4, 1e-3]
+    WINDOW = [100, 175, 250]
+    STRIDE = [1, 50]
+    BATCH = [3, 10, 15, 20]
+    LSTM_PARAMS = [[100], [250], [500]]
+    L_RATE = [2e-4]
     ACTIVATION = [[tf.nn.leaky_relu], [tf.nn.relu], [tf.nn.tanh]]
-    NORMALIZATION = ['maxmin-11', 'maxmin01', 'normal']
+    NORMALIZATION = ['maxmin-11']
     
     PARAMETERS = [WINDOW, STRIDE, BATCH, LSTM_PARAMS, L_RATE, ACTIVATION, NORMALIZATION]
     
@@ -49,7 +49,7 @@ if __name__ == '__main__':
     prev_best_f1 = 0.
     
     is_not_first_round = False  # optimize all the params in the row, if this is the very first attempt
-    target_score = lambda p, r: (p >= .5)
+    target_score = lambda p, r: (p >= .7)
     objective_reached = target_score(total_precision, total_recall)
       
     while (objective_reached is False):

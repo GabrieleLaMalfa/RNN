@@ -21,15 +21,15 @@ if __name__ == '__main__':
 
     DATA_PATH = '../../data/power_consumption.csv'
     
-    window = 50
-    stride = 10
+    window = 300
+    stride = 60
     batch_size = 5
     l_rate = 2e-4
-    lstm_params = [100]
+    lstm_params = [1100]
     lstm_activation = [tf.nn.tanh]
     
     # optimize over this vector the precision or F1-score
-    sigma_threshold = [round(i*1e-5, 5) for i in range(1, 1000, 25)]
+    sigma_threshold = [round(i*1e-5, 6) for i in range(1, 1000, 20)]
 
     non_train_percentage = 0.7
     training_epochs = 250
