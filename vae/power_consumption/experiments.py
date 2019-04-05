@@ -21,15 +21,16 @@ if __name__ == '__main__':
     
     # parameters of the model
     data_path = '../../data/power_consumption.csv'
-    sequence_len = 150
-    stride = 50
+    sequence_len = 50
+    stride = 1
     vae_hidden_size = 10
+    subsampling = 3
     
     # maximize precision or F1-score over this vector
-    sigma_threshold_elbo = [round(i*1e-3, 5) for i in range(1, 100, 5)]
+    sigma_threshold_elbo = [round(i*1e-5, 5) for i in range(1, 100, 10)]
     
-    learning_rate_elbo = 1e-4
-    vae_activation = tf.nn.relu
+    learning_rate_elbo = 1e-5
+    vae_activation = tf.nn.tanh
     normalization = 'maxmin-11'
     
     # reset computational graph
@@ -46,7 +47,7 @@ if __name__ == '__main__':
     
     # early-stopping parameters
     stop_on_growing_error = True
-    stop_valid_percentage = .3  # percentage of validation used for early-stopping 
+    stop_valid_percentage = .2  # percentage of validation used for early-stopping 
     min_loss_improvment = .02  # percentage of minimum loss' decrease (.01 is 1%)
     
     # define input/output pairs
@@ -126,11 +127,12 @@ if __name__ == '__main__':
                                                              window=sequence_len,
                                                              stride=stride,
                                                              mode='validation', 
-                                                             non_train_percentage=.7,
+                                                             non_train_percentage=.3,
                                                              val_rel_percentage=.8,
                                                              normalize=normalization,
                                                              time_difference=False,
-                                                             td_method=None)
+                                                             td_method=None,
+                                                             subsampling=subsampling)
        
     # suppress second axis on Y values (the algorithms expects shapes like (n,) for the prediction)
     y_train = y_train[:,0]; y_valid = y_valid[:,0]; y_test = y_test[:,0]
@@ -236,15 +238,11 @@ if __name__ == '__main__':
                 
             # predictions
             predicted_positive = np.array([vae_anomalies]).T
-            
-            if len(vae_anomalies) == 0:
-                
-                continue
                 
             # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
             # train 70%, validation_relative 80%
             target_anomalies = np.zeros(shape=int(np.floor(y_test.shape[0] / batch_size))*batch_size)
-            target_anomalies[4100:4400] = 1
+            target_anomalies[400:550] = 1
         
             # real values
             condition_positive = np.argwhere(target_anomalies == 1)
@@ -261,7 +259,7 @@ if __name__ == '__main__':
                 
             print("Precision and recall for threshold: ", t, " is ", (precision, recall))
             
-            if precision > best_precision:
+            if precision >= best_precision:
                 
                 best_threshold = t
                 best_precision = precision

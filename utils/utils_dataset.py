@@ -122,7 +122,8 @@ def series_to_matrix(series, k_shape, striding=1):
          'gaussian': normalize (as gaussian with mean .0 and standard deviation 1.).
      time-difference:boolean, specify whether time difference techniques are used;
      td_method:function, specify which function is used to perform time-difference on data.
-          This variable is considered if and only if time_difference is True.
+          This variable is considered if and only if time_difference is True;
+     subsampling:integer, downsampling frequence: i.e. how many samples are skipped for one that is taken.
  Returns:
      dataset:numpy.array, the data ready to be used.
 """
@@ -134,10 +135,16 @@ def generate_batches(filename,
                      val_rel_percentage=.5,
                      normalize='maxmin01',
                      time_difference=False,
-                     td_method=None):
+                     td_method=None,
+                     subsampling=1):
 
     data = pd.read_csv(filename, delimiter=',', header=0)
     data = (data.iloc[:, 0]).values
+    
+    # downsampling
+    if int(subsampling) > 1:
+        
+        data = data[::int(subsampling)]
 
     # normalize dataset (max-min method)
     if normalize == 'maxmin01':
