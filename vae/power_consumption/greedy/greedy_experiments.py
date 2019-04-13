@@ -5,57 +5,47 @@ Created on Sun Feb 10 09:36:16 2019
 @author: Emanuele
 """
 
-import copy as cp
 import numpy as np
-import matplotlib.pyplot as plt
 import scipy.stats as scistats
 import sys
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-sys.path.append('../../utils')
+sys.path.append('../../../utils')
 import utils_dataset as utils
 
 
-if __name__ == '__main__':
-    
-    # parameters of the model
-    data_path = '../../data/power_consumption.csv'
-    sequence_len = 40
-    stride = 1
-    vae_hidden_size = 5
-    subsampling = 5
-    lambda_reg = (1e-2, 1e-2)  # elastic net 'lambdas', L1-L2
-    
-    # maximize precision or F1-score over this vector
-    sigma_threshold_elbo = [1e-2] # [i*1e-3 for i in range(1, 100, 10)]
-    
-    learning_rate_elbo = 1e-4
-    vae_activation = tf.nn.tanh
-    normalization = 'maxmin-11'
+def vae_experiment(data_path,
+                   sequence_len,
+                   stride,
+                   vae_activation,
+                   vae_hidden_size,
+                   learning_rate_elbo,
+                   normalization):
     
     # reset computational graph
     tf.reset_default_graph()
     
-    # other parameters
+    # parameters that are constant
+    subsampling = 5
     batch_size = 1
+    
+    # maximize precision or precision/F1-score over this vector
+    sigma_threshold_elbo = [round(i*1e-3, 5) for i in range(1, 100, 5)]
     
     # training epochs
     epochs = 100
-       
-    # number of sampling per iteration in the VAE hidden layer
-    samples_per_iter = 1
     
     # early-stopping parameters
     stop_on_growing_error = True
-    stop_valid_percentage = 1.  # percentage of validation used for early-stopping 
+    stop_valid_percentage = .3  # percentage of validation used for early-stopping 
     min_loss_improvment = .01  # percentage of minimum loss' decrease (.01 is 1%)
     
     # define input/output pairs
     input_ = tf.placeholder(tf.float32, [None, sequence_len, batch_size])  # (batch, input, time)
     
     # encoder/decoder parameters + initialization
-    vae_encoder_shape_weights = [batch_size*sequence_len, int(batch_size*sequence_len/2), vae_hidden_size*2]
+    vae_encoder_shape_weights = [batch_size*sequence_len, int(batch_size*sequence_len/2), vae_hidden_size*3]
     vae_decoder_shape_weights = [vae_hidden_size, int(batch_size*sequence_len/2), batch_size*sequence_len]
     
     zip_weights_encoder = zip(vae_encoder_shape_weights[:-1], vae_encoder_shape_weights[1:])
@@ -73,32 +63,31 @@ if __name__ == '__main__':
     flattened_input = tf.layers.flatten(input_)
     
     vae_encoder = tf.matmul(flattened_input, weights_vae_encoder[0]) + bias_vae_encoder[0]
-    vae_encoder = vae_activation(vae_encoder)
     
     for (w_vae, b_vae) in zip(weights_vae_encoder[1:], bias_vae_encoder[1:]):
         
-        vae_encoder = tf.matmul(vae_encoder, w_vae) + b_vae
         vae_encoder = vae_activation(vae_encoder)
+        vae_encoder = tf.matmul(vae_encoder, w_vae) + b_vae
     
     # means and variances' vectors of the learnt hidden distribution
     #  we assume the hidden gaussian's variances matrix is diagonal
-    loc = tf.slice(vae_encoder, [0, 0], [-1, vae_hidden_size])
+    loc = tf.slice(vae_activation(vae_encoder), [0, 0], [-1, vae_hidden_size])
     loc = tf.squeeze(loc, axis=0)
     scale = tf.slice(tf.nn.softplus(vae_encoder), [0, vae_hidden_size], [-1, vae_hidden_size])
-    scale = tf.squeeze(scale, 0)  
+    scale = tf.squeeze(scale, 0)
     
-    # sample from the hidden ditribution
+    # isolate the sample from the hidden distribution
+    hidden_sample = tf.slice(tf.nn.softplus(vae_encoder), [0, 2*vae_hidden_size], [-1, vae_hidden_size])
+    hidden_sample = tf.squeeze(hidden_sample, 0)
+      
     vae_hidden_distr = tfp.distributions.MultivariateNormalDiag(loc, scale)
     
-    # re-parametrization trick: sample from standard multivariate gaussian,
-    #  multiply by std and add mean (from the input sample)
-    vae_hidden_state = tfp.distributions.MultivariateNormalDiag(tf.zeros(vae_hidden_size),
-                                                                tf.ones(vae_hidden_size))
-    vae_hidden_state = loc + vae_hidden_state.sample()*scale
+    # extract each sample 'watermark' as last 'vae_hidde_size' points of the input_ itself
+    vae_hidden_state = hidden_sample
     
     # get probability of the hidden state
-    s_ = vae_hidden_distr.sample(int(100e4))
-    in_box = tf.cast(tf.reduce_all(s_ <= vae_hidden_state, axis=-1), vae_hidden_distr.dtype)
+    s_ = vae_hidden_distr.sample(int(10e4))
+    in_box = tf.cast(tf.reduce_all(s_ <= hidden_sample, axis=-1), vae_hidden_distr.dtype)
     vae_hidden_prob = tf.reduce_mean(in_box, axis=0)
         
     feed_decoder = tf.reshape(vae_hidden_state, shape=(-1, vae_hidden_size))
@@ -119,29 +108,19 @@ if __name__ == '__main__':
     prior = tfp.distributions.MultivariateNormalDiag(tf.constant(np.zeros(vae_hidden_size, dtype='float32')),
                                                      tf.constant(np.ones(vae_hidden_size, dtype='float32')))
     
-    divergence = tfp.distributions.kl_divergence(prior, vae_hidden_distr)
+    divergence = tfp.distributions.kl_divergence(vae_hidden_distr, prior)
     elbo = tf.reduce_mean(likelihood - divergence)
     
-    # apply elastic net regularization (lambda_reg is the couple parameter that controls L1-L2 combination)
-    l1_regularizer = tf.contrib.layers.l1_regularizer(scale=0.005, scope=None)
-    nn_params = tf.trainable_variables() # all vars of your graph
-    l1_regularization_penalty = tf.contrib.layers.apply_regularization(l1_regularizer, nn_params)
+    optimizer_elbo = tf.train.AdamOptimizer(learning_rate_elbo).minimize(-elbo)
     
-    l2_regularizer = tf.contrib.layers.l2_regularizer(scale=0.005, scope=None)
-    l2_regularization_penalty = tf.contrib.layers.apply_regularization(l2_regularizer, nn_params)
-    
-    regularized_elbo = -elbo + lambda_reg[0]*l1_regularization_penalty + lambda_reg[1]*l2_regularization_penalty
-        
-    optimizer_elbo = tf.train.AdamOptimizer(learning_rate_elbo).minimize(regularized_elbo)
-
     # extract train and test
     x_train, y_train, x_valid, y_valid, x_test, y_test = utils.generate_batches(
                                                              filename=data_path, 
                                                              window=sequence_len,
                                                              stride=stride,
                                                              mode='validation', 
-                                                             non_train_percentage=.5,
-                                                             val_rel_percentage=.5,
+                                                             non_train_percentage=.19,
+                                                             val_rel_percentage=.4,
                                                              normalize=normalization,
                                                              time_difference=False,
                                                              td_method=None,
@@ -175,8 +154,7 @@ if __name__ == '__main__':
         e = 0
         
         while e < epochs:
-                
-            print("epoch ", e)
+                        
             iter_ = 0
             
             while iter_ < int(np.floor(x_train.shape[0] / batch_size)):
@@ -189,7 +167,7 @@ if __name__ == '__main__':
                 iter_ +=  1
 
             if stop_on_growing_error:
-                                               
+
                 current_error_on_valid = .0
                 
                 # verificate stop condition
@@ -202,14 +180,10 @@ if __name__ == '__main__':
                     current_error_on_valid +=  np.abs(np.sum(sess.run(-elbo, feed_dict={input_: batch_x_val})))
 
                     iter_val_ += 1
-                    
-                print("Previous error on valid ", last_error_on_valid)
-                print("Current error on valid ", current_error_on_valid)
                                  
                 # stop learning if the loss reduction is below the threshold (current_loss/past_loss)
                 if current_error_on_valid > last_error_on_valid or (np.abs(current_error_on_valid/last_error_on_valid) > 1-min_loss_improvment and e!=0):
-                    
-                    print("Early stopping: validation error has increased since last epoch.")
+            
                     e = epochs
                         
                 last_error_on_valid = current_error_on_valid
@@ -220,35 +194,28 @@ if __name__ == '__main__':
         y_test = y_test[:x_test.shape[0]]
         
         # find the thershold that maximizes the F1-score
-        best_precision = best_recall = best_threshold = .0
-        best_predicted_positive = np.array([])
-        condition_positive = np.array([])
+        best_precision = best_recall = .0
+        best_threshold = .0
         
         for t in sigma_threshold_elbo:
             
-            print("Optimizing with threshold's value: ", t)
-            
             vae_anomalies = []
+            threshold_elbo = (t, 1.-t)  
             p_anom = np.zeros(shape=(int(np.floor(x_test.shape[0] / batch_size)),))
-            threshold_elbo = (t, 1.-t)            
             iter_ = 0
             
             while iter_ < int(np.floor(x_test.shape[0] / batch_size)):
         
                 batch_x = x_test[iter_*batch_size: (iter_+1)*batch_size, :].T.reshape(1, sequence_len, batch_size)
-                
-                
+                            
                 # get probability of the encoding and a boolean (anomaly or not)        
                 p_anom[iter_] = sess.run(vae_hidden_prob, feed_dict={input_: batch_x})  
                 
-                """
-                # highlight anomalies   (the whole window is considered)                 
-                if (p_anom[iter_] <= threshold_elbo[0]) and iter_<int(np.floor(x_test.shape[0] / batch_size))-sequence_len:
+                if (p_anom[iter_] <= threshold_elbo[0]):
                     
-                    for i in range(iter_, iter_+sequence_len):
+                    for i in range(iter_*batch_size, (iter_+1)*batch_size):
                         
                         vae_anomalies.append(i)
-                """
                                            
                 iter_ +=  1
                 
@@ -256,9 +223,8 @@ if __name__ == '__main__':
             predicted_positive = np.array([vae_anomalies]).T
                 
             # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
-            # train 70%, validation_relative 80%
             target_anomalies = np.zeros(shape=int(np.floor(y_test.shape[0] / batch_size))*batch_size)
-            target_anomalies[0:1] = 1
+            target_anomalies[650-sequence_len:] = 1
         
             # real values
             condition_positive = np.argwhere(target_anomalies == 1)
@@ -272,7 +238,7 @@ if __name__ == '__main__':
             except ZeroDivisionError:
                 
                 precision = recall = .0
-                
+            
             print("Precision and recall for threshold: ", t, " is ", (precision, recall))
             
             if precision >= best_precision:
@@ -280,34 +246,5 @@ if __name__ == '__main__':
                 best_threshold = t
                 best_precision = precision
                 best_recall = recall
-                best_predicted_positive = cp.copy(predicted_positive)
-                
-        # plot data series    
-        fig, ax1 = plt.subplots()
         
-        print("\nTime series:")
-        ax1.plot(y_test, 'b', label='index')
-        ax1.set_xlabel('Time')
-        ax1.set_ylabel('Space Shuttle')
-        
-        # plot predictions
-        for i in np.sort(np.unique(vae_anomalies)):
-    
-            plt.axvspan(i, i+1, color='yellow', alpha=0.5, lw=0)
-    
-        fig.tight_layout()
-        plt.show()
-        
-        fig, ax1 = plt.subplots()
-
-        ax1.plot(p_anom, 'b', label='index')
-        ax1.set_xlabel('Time')
-        ax1.set_ylabel('Likelihood')
-                
-        fig.tight_layout()
-        plt.show()
-                
-        print("Anomalies in the series:", condition_positive.T)
-        print("Anomalies detected with threshold: ", best_threshold)
-        print(best_predicted_positive.T)
-        print("Precision and recall ", best_precision, best_recall)
+        return best_precision, best_recall, best_threshold       

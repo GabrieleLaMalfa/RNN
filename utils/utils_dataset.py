@@ -153,7 +153,7 @@ def generate_batches(filename,
     
     elif normalize == 'maxmin-11':
     
-        avg = (np.max(data)-np.min(data))/2
+        avg = (np.mean(data)-np.min(data))/2
         data = (data-avg)/avg
         
     elif normalize == 'gaussian':

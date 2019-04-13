@@ -17,7 +17,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 matplotlib.rcParams['figure.figsize'] = (16.0, 12.0)
-matplotlib.style.use('ggplot')
+#matplotlib.style.use('ggplot')
 
 """
  Model data by finding best fit distribution to data.
