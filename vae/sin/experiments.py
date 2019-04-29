@@ -21,20 +21,22 @@ if __name__ == '__main__':
     
     # parameters of the model
     data_path = '../../data/sin.csv'
-    sequence_len = 20
-    stride = 1
-    vae_hidden_size = 3
+    sequence_len = 200
+    stride = 20
+    random_stride = True  # for each training epoch, use a random value of stride between 1 and stride
+    vae_hidden_size = 1
+    subsampling = 3
+    elbo_importance = (.5, 1.)  # relative importance to reconstruction and divergence
+    lambda_reg = (5e-3, 5e-3)  # elastic net 'lambdas', L1-L2
+    rounding = None
     
     # maximize precision or F1-score over this vector
-    sigma_threshold_elbo = [1e-3]
+    sigma_threshold_elbo = [1e-2] # [i*1e-3 for i in range(1, 100, 10)]
     
-    learning_rate_elbo = 1e-4
-    vae_activation = tf.nn.leaky_relu
-    normalization = 'maxmin-11'
-    
-    # reset computational graph
-    tf.reset_default_graph()
-    
+    learning_rate_elbo = 1e-3
+    vae_activation = tf.nn.tanh
+    normalization = 'maxmin01'
+        
     # other parameters
     batch_size = 1
     
@@ -46,113 +48,178 @@ if __name__ == '__main__':
     
     # early-stopping parameters
     stop_on_growing_error = True
-    stop_valid_percentage = .3  # percentage of validation used for early-stopping 
-    min_loss_improvment = .02  # percentage of minimum loss' decrease (.01 is 1%)
+    stop_valid_percentage = 1.  # percentage of validation used for early-stopping 
+    min_loss_improvment = .01  # percentage of minimum loss' decrease (.01 is 1%)
     
-    # define input/output pairs
-    input_ = tf.placeholder(tf.float32, [None, sequence_len, batch_size])  # (batch, input, time)
+    # reset computational graph
+    tf.reset_default_graph()
     
-    # encoder/decoder parameters + initialization
-    vae_encoder_shape_weights = [batch_size*sequence_len, vae_hidden_size*3]
-    vae_decoder_shape_weights = [vae_hidden_size, batch_size*sequence_len]
-    
-    zip_weights_encoder = zip(vae_encoder_shape_weights[:-1], vae_encoder_shape_weights[1:])
-    
-    weights_vae_encoder = [tf.Variable(tf.truncated_normal(shape=[shape,
-                                                                  next_shape])) for (shape, next_shape) in zip_weights_encoder]
-    bias_vae_encoder = [tf.Variable(tf.truncated_normal(shape=[shape])) for shape in vae_encoder_shape_weights[1:]]
-    
-    zip_weights_decoder = zip(vae_decoder_shape_weights[:-1], vae_decoder_shape_weights[1:])
-    weights_vae_decoder = [tf.Variable(tf.truncated_normal(shape=[shape,
-                                                                  next_shape])) for (shape, next_shape) in zip_weights_decoder]
-    bias_vae_decoder = [tf.Variable(tf.truncated_normal(shape=[shape])) for shape in vae_decoder_shape_weights[1:]]
-    
-    # VAE graph's definition
-    flattened_input = tf.layers.flatten(input_)
-    
-    vae_encoder = tf.matmul(flattened_input, weights_vae_encoder[0]) + bias_vae_encoder[0]
-    
-    for (w_vae, b_vae) in zip(weights_vae_encoder[1:], bias_vae_encoder[1:]):
+    # create the computational graph
+    with tf.device('/device:CPU:0'):
+                
+        # define input/output pairs
+        input_ = tf.placeholder(tf.float32, [None, sequence_len, batch_size])  # (batch, input, time)
         
+        # encoder/decoder parameters + initialization
+        vae_encoder_shape_weights = [batch_size*sequence_len, int(batch_size*sequence_len*.5), vae_hidden_size*2]
+        vae_decoder_shape_weights = [vae_hidden_size, int(batch_size*sequence_len*.5), batch_size*sequence_len]
+        
+        zip_weights_encoder = zip(vae_encoder_shape_weights[:-1], vae_encoder_shape_weights[1:])
+        
+        weights_vae_encoder = [tf.Variable(tf.truncated_normal(shape=[shape,
+                                                                      next_shape])) for (shape, next_shape) in zip_weights_encoder]
+        bias_vae_encoder = [tf.Variable(tf.truncated_normal(shape=[shape])) for shape in vae_encoder_shape_weights[1:]]
+        
+        zip_weights_decoder = zip(vae_decoder_shape_weights[:-1], vae_decoder_shape_weights[1:])
+        weights_vae_decoder = [tf.Variable(tf.truncated_normal(shape=[shape,
+                                                                      next_shape])) for (shape, next_shape) in zip_weights_decoder]
+        bias_vae_decoder = [tf.Variable(tf.truncated_normal(shape=[shape])) for shape in vae_decoder_shape_weights[1:]]
+        
+        # VAE graph's definition
+        flattened_input = tf.layers.flatten(input_)
+        
+        vae_encoder = tf.matmul(flattened_input, weights_vae_encoder[0]) + bias_vae_encoder[0]
         vae_encoder = vae_activation(vae_encoder)
-        vae_encoder = tf.matmul(vae_encoder, w_vae) + b_vae
-    
-    # means and variances' vectors of the learnt hidden distribution
-    #  we assume the hidden gaussian's variances matrix is diagonal
-    loc = tf.slice(vae_activation(vae_encoder), [0, 0], [-1, vae_hidden_size])
-    loc = tf.squeeze(loc, axis=0)
-    scale = tf.slice(tf.nn.softplus(vae_encoder), [0, vae_hidden_size], [-1, vae_hidden_size])
-    scale = tf.squeeze(scale, 0)
-    hidden_sample = tf.slice(tf.nn.softplus(vae_encoder), [0, 2*vae_hidden_size], [-1, vae_hidden_size])
-    hidden_sample = tf.squeeze(hidden_sample, 0)
-      
-    # sample from the hidden ditribution
-    vae_hidden_distr = tfp.distributions.MultivariateNormalDiag(loc, scale)
-    
-    # extract each sample 'watermark' as last 'vae_hidde_size' points of the input_ itself
-    vae_hidden_state = hidden_sample
-    
-    # get probability of the hidden state
-    s_ = vae_hidden_distr.sample(int(100e4))
-    in_box = tf.cast(tf.reduce_all(s_ <= hidden_sample, axis=-1), vae_hidden_distr.dtype)
-    vae_hidden_prob = tf.reduce_mean(in_box, axis=0)
         
-    feed_decoder = tf.reshape(vae_hidden_state, shape=(-1, vae_hidden_size))
-    vae_decoder = tf.matmul(feed_decoder, weights_vae_decoder[0]) + bias_vae_decoder[0]
-    vae_decoder = vae_activation(vae_decoder)    
-    
-    for (w_vae, b_vae) in zip(weights_vae_decoder[1:], bias_vae_decoder[1:]):
+        for (w_vae, b_vae) in zip(weights_vae_encoder[1:], bias_vae_encoder[1:]):
+            
+            vae_encoder = tf.matmul(vae_encoder, w_vae) + b_vae
+            vae_encoder = vae_activation(vae_encoder)
         
-        vae_decoder = tf.matmul(vae_decoder, w_vae) + b_vae
-        vae_decoder = vae_activation(vae_decoder)
-    
-    # time-series reconstruction and ELBO loss
-    vae_reconstruction = tfp.distributions.MultivariateNormalDiag(tf.constant(np.zeros(batch_size*sequence_len, dtype='float32')),
-                                                                  tf.constant(np.ones(batch_size*sequence_len, dtype='float32')))
-    
-    likelihood = vae_reconstruction.log_prob(flattened_input)
-    
-    prior = tfp.distributions.MultivariateNormalDiag(tf.constant(np.zeros(vae_hidden_size, dtype='float32')),
-                                                     tf.constant(np.ones(vae_hidden_size, dtype='float32')))
-    
-    divergence = tfp.distributions.kl_divergence(vae_hidden_distr, prior)
-    elbo = tf.reduce_mean(likelihood - divergence)
-    
-    optimizer_elbo = tf.train.AdamOptimizer(learning_rate_elbo).minimize(-elbo)
-
-    # extract train and test
-    x_train, y_train, x_valid, y_valid, x_test, y_test = utils.generate_batches(
-                                                             filename=data_path, 
-                                                             window=sequence_len,
-                                                             stride=stride,
-                                                             mode='validation', 
-                                                             non_train_percentage=.5,
-                                                             val_rel_percentage=.5,
-                                                             normalize=normalization,
-                                                             time_difference=False,
-                                                             td_method=None)
+        # means and variances' vectors of the learnt hidden distribution
+        #  we assume the hidden gaussian's variances matrix is diagonal
+        loc = tf.slice(vae_encoder, [0, 0], [-1, vae_hidden_size])
+        loc = tf.squeeze(loc, axis=0)
+        scale = tf.slice(tf.nn.softplus(vae_encoder), [0, vae_hidden_size], [-1, vae_hidden_size])
+        scale = tf.squeeze(scale, 0) 
+        
+        """
+        # the distribution is in charge of generating the hidden sample
+        hidden_sample = tf.slice(vae_encoder, [0, 2*vae_hidden_size], [-1, vae_hidden_size])
+        """
+        
+        # sample from the hidden ditribution
+        vae_hidden_distr = tfp.distributions.MultivariateNormalDiag(loc, scale)
+        
+        # re-parametrization trick: sample from standard multivariate gaussian,
+        #  multiply by std and add mean (from the input sample)
+        prior = tfp.distributions.MultivariateNormalDiag(tf.zeros(vae_hidden_size),
+                                                         tf.ones(vae_hidden_size))
+        
+        hidden_sample = prior.sample()*scale + loc
+        
+        # get probability of the hidden state
+        vae_hidden_prob = prior.prob(hidden_sample)
+        
+        """
+        # get probability of the hidden state
+        s_ = vae_hidden_distr.sample(int(100e6))
+        in_box = tf.cast(tf.reduce_all(s_ <= hidden_sample, axis=-1), prior.dtype)
+        vae_hidden_prob = tf.reduce_mean(in_box, axis=0)
+        """
+            
+        feed_decoder = tf.reshape(hidden_sample, shape=(-1, vae_hidden_size))
+        vae_decoder = tf.matmul(feed_decoder, weights_vae_decoder[0]) + bias_vae_decoder[0]
+        vae_decoder = vae_activation(vae_decoder)    
+        
+        for (w_vae, b_vae) in zip(weights_vae_decoder[1:], bias_vae_decoder[1:]):
+            
+            vae_decoder = tf.matmul(vae_decoder, w_vae) + b_vae
+            vae_decoder = vae_activation(vae_decoder)
+        
+        # time-series reconstruction and ELBO loss
+        vae_reconstruction = tfp.distributions.MultivariateNormalDiag(tf.constant(np.zeros(batch_size*sequence_len, dtype='float32')),
+                                                                      tf.constant(np.ones(batch_size*sequence_len, dtype='float32')))
+            
+        likelihood = elbo_importance[0]*vae_reconstruction.log_prob(vae_decoder)            
+        divergence = elbo_importance[1]*tfp.distributions.kl_divergence(prior, vae_hidden_distr)        
+        elbo = tf.reduce_mean(likelihood - divergence)
+        
+        # apply elastic net regularization (lambda_reg is the couple parameter that controls L1-L2 combination)
+        l1_regularizer = tf.contrib.layers.l1_regularizer(scale=lambda_reg[0], scope=None)
+        nn_params = tf.trainable_variables() # all vars of your graph
+        l1_regularization_penalty = tf.contrib.layers.apply_regularization(l1_regularizer, nn_params)
+        
+        l2_regularizer = tf.contrib.layers.l2_regularizer(scale=lambda_reg[1], scope=None)
+        l2_regularization_penalty = tf.contrib.layers.apply_regularization(l2_regularizer, nn_params)
+        
+        regularized_elbo = -elbo + l1_regularization_penalty + l2_regularization_penalty
+            
+        optimizer_elbo = tf.train.AdamOptimizer(learning_rate_elbo).minimize(regularized_elbo)
+        
+    if random_stride == False:
+        
+        # extract train and test
+        x_train, y_train, x_valid, y_valid, x_test, y_test = utils.generate_batches(
+                                                                 filename=data_path, 
+                                                                 window=sequence_len,
+                                                                 stride=stride,
+                                                                 mode='validation', 
+                                                                 non_train_percentage=.5,
+                                                                 val_rel_percentage=.5,
+                                                                 normalize=normalization,
+                                                                 time_difference=False,
+                                                                 td_method=None,
+                                                                 subsampling=subsampling,
+                                                                 rounding=rounding)
        
-    # suppress second axis on Y values (the algorithms expects shapes like (n,) for the prediction)
-    y_train = y_train[:,0]; y_valid = y_valid[:,0]; y_test = y_test[:,0]
-    
-    if len(x_train) > len(y_train):
+        # suppress second axis on Y values (the algorithms expects shapes like (n,) for the prediction)
+        y_train = y_train[:,0]; y_valid = y_valid[:,0]; y_test = y_test[:,0]
         
-        x_train = x_train[:len(y_train)]
-    
-    if len(x_valid) > len(y_valid):
+        if len(x_train) > len(y_train):
+            
+            x_train = x_train[:len(y_train)]
         
-        x_valid = x_valid[:len(y_valid)]
-    
-    if len(x_test) > len(y_test):
+        if len(x_valid) > len(y_valid):
+            
+            x_valid = x_valid[:len(y_valid)]
         
-        x_test = x_test[:len(y_test)]
+        if len(x_test) > len(y_test):
+            
+            x_test = x_test[:len(y_test)]
         
-    # train + early-stopping
-    init = tf.global_variables_initializer()
+        
 
-    with tf.Session() as sess:
+    with tf.Session(config=tf.ConfigProto(allow_soft_placement=False,
+                                          log_device_placement=True)) as sess:
+        
+        # create dataset with random stride
+        # extract train and test
+        if random_stride == True: 
+            
+            x_train, y_train, x_valid, y_valid, x_test, y_test = utils.generate_batches(
+                                                                     filename=data_path, 
+                                                                     window=sequence_len,
+                                                                     stride=np.random.randint(1, stride),
+                                                                     mode='validation', 
+                                                                     non_train_percentage=.5,
+                                                                     val_rel_percentage=.5,
+                                                                     normalize=normalization,
+                                                                     time_difference=False,
+                                                                     td_method=None,
+                                                                     subsampling=subsampling,
+                                                                     rounding=rounding)
+           
+            # suppress second axis on Y values (the algorithms expects shapes like (n,) for the prediction)
+            y_train = y_train[:,0]; y_valid = y_valid[:,0]; y_test = y_test[:,0]
+            
+            if len(x_train) > len(y_train):
+                
+                x_train = x_train[:len(y_train)]
+            
+            if len(x_valid) > len(y_valid):
+                
+                x_valid = x_valid[:len(y_valid)]
+            
+            if len(x_test) > len(y_test):
+                
+                x_test = x_test[:len(y_test)]
+        
+        # train + early-stopping
+        init = tf.global_variables_initializer()
         
         sess.run(init)
+        tf.random.set_random_seed(42)
         
         # train
         last_error_on_valid = np.inf
@@ -225,11 +292,14 @@ if __name__ == '__main__':
                 # get probability of the encoding and a boolean (anomaly or not)        
                 p_anom[iter_] = sess.run(vae_hidden_prob, feed_dict={input_: batch_x})  
                 
-                if (p_anom[iter_] <= threshold_elbo[0] or p_anom[iter_] >= threshold_elbo[1]):
+                """
+                # highlight anomalies   (the whole window is considered)                 
+                if (p_anom[iter_] <= threshold_elbo[0] and iter_<int(np.floor(x_test.shape[0] / batch_size))-sequence_len):
                     
-                    for i in range(iter_*batch_size, (iter_+1)*batch_size):
+                    for i in range(iter_, iter_+sequence_len):
                         
                         vae_anomalies.append(i)
+                """
                                            
                 iter_ +=  1
                 
@@ -244,8 +314,7 @@ if __name__ == '__main__':
             # train 50%, validation_relative 50%
             # performances
             target_anomalies = np.zeros(shape=int(np.floor(y_test.shape[0] / batch_size))*batch_size)
-            target_anomalies[860:895] = target_anomalies[1096:1126] = 1
-            target_anomalies[1546:1585] = target_anomalies[1891:1931] = 1
+            target_anomalies[160:200] = 1
         
             # real values
             condition_positive = np.argwhere(target_anomalies == 1)
@@ -262,7 +331,7 @@ if __name__ == '__main__':
                 
             print("Precision and recall for threshold: ", t, " is ", (precision, recall))
             
-            if precision > best_precision:
+            if precision >= best_precision:
                 
                 best_threshold = t
                 best_precision = precision
@@ -287,7 +356,7 @@ if __name__ == '__main__':
         
         fig, ax1 = plt.subplots()
 
-        ax1.plot(p_anom, 'b', label='index')
+        ax1.scatter([i for i in range(len(p_anom))],p_anom)
         ax1.set_xlabel('Time')
         ax1.set_ylabel('Likelihood')
                 

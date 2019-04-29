@@ -119,11 +119,15 @@ def series_to_matrix(series, k_shape, striding=1):
      normalize:string, available normalization techniques:
          'maxmin01': normalize in the range [0,1];
          'maxmin-11': normalize in the range [-1,1].;
-         'gaussian': normalize (as gaussian with mean .0 and standard deviation 1.).
+         'gaussian': normalize (as gaussian with mean .0 and standard deviation 1.);
+         'haar': Haar-Wavelet normalization;
+         'haar01': same as 'haar' but whit previous [0,1] normalization;
+         'haar-11': same as 'haar' but whit previous [-1,1] normalization.        
      time-difference:boolean, specify whether time difference techniques are used;
      td_method:function, specify which function is used to perform time-difference on data.
           This variable is considered if and only if time_difference is True;
-     subsampling:integer, downsampling frequence: i.e. how many samples are skipped for one that is taken.
+     subsampling:integer, downsampling frequence: i.e. how many samples are skipped for one that is taken;
+     rounding:int, set max number of digits to represent each datum.
  Returns:
      dataset:numpy.array, the data ready to be used.
 """
@@ -136,7 +140,8 @@ def generate_batches(filename,
                      normalize='maxmin01',
                      time_difference=False,
                      td_method=None,
-                     subsampling=1):
+                     subsampling=1,
+                     rounding=None):
 
     data = pd.read_csv(filename, delimiter=',', header=0)
     data = (data.iloc[:, 0]).values
@@ -159,10 +164,36 @@ def generate_batches(filename,
     elif normalize == 'gaussian':
         
         data = (data-np.mean(data))/np.std(data)
+        
+    # with Haar transformation, it is better to use a window of even size
+    elif normalize == 'haar':
+        
+        data = series_to_matrix(data, 2, 1)
+        data = np.dot(np.array([[1,1],[1,-1]]), data.T)/2**.5
+        data = np.ravel(data) 
+        
+    elif normalize == 'haar01':
+
+        data = (data-np.min(data))/(np.max(data)-np.min(data))
+        data = series_to_matrix(data, 2, 1)
+        data = np.dot(np.array([[1,1],[1,-1]]), data.T)/2**.5
+        data = np.ravel(data) 
+        
+    elif normalize == 'haar-11':
+        
+        avg = (np.mean(data)-np.min(data))/2
+        data = (data-avg)/avg
+        data = series_to_matrix(data, 2, 1)
+        data = np.dot(np.array([[1,1],[1,-1]]), data.T)/2**.5
+        data = np.ravel(data) 
     
     else:
         
         print("Dataset is not normalized.")
+
+    if rounding != None:
+        
+        data = np.round(data, int(rounding))
                 
     # if the flag 'time-difference' is enabled, turn the dataset into the variation of each time 
     #  step with the previous value (loose the firt sample)
@@ -250,7 +281,7 @@ def lstm_exp(filename,
              stop_on_growing_error=False,
              stop_valid_percentage=1.,
              verbose=True):
-    
+            
     # clear computational graph
     tf.reset_default_graph()
 
@@ -340,11 +371,12 @@ def lstm_exp(filename,
     # optimization
     opt = tf.train.GradientDescentOptimizer(learning_rate=l_rate).minimize(loss)
 
-    init = tf.global_variables_initializer()
-
     with tf.Session() as sess:
+        
+        init = tf.global_variables_initializer()
+        
         sess.run(init)
-
+    
         # train phase
         epochs = training_epochs
         plot_y = list()
@@ -358,7 +390,7 @@ def lstm_exp(filename,
         
         e = 0
         while e < (epochs + 1):
-
+    
             iter_ = 0
             
             if verbose: 
@@ -371,13 +403,13 @@ def lstm_exp(filename,
                     
                     batch_x = X[np.newaxis, iter_ * batch_size:batch_size * (iter_ + 1)]
                     batch_y = Y[np.newaxis, iter_ * batch_size:batch_size * (iter_ + 1)]
-
+    
                     sess.run(opt, feed_dict={x: batch_x, y: batch_y})
                                                
                     iter_ = iter_ + 1
                 
                 if stop_on_growing_error:
-
+    
                     current_error_on_valid = .0
                     
                     # verificate stop condition
@@ -389,7 +421,7 @@ def lstm_exp(filename,
                         
                         # accumulate error
                         current_error_on_valid +=  np.abs(np.sum(sess.run(error, feed_dict={x: batch_x_val, y: batch_y_val})))
-
+    
                         iter_val_ += 1
                      
                     if verbose: 
@@ -419,25 +451,25 @@ def lstm_exp(filename,
                     e = epochs - 3
                         
                 last_error_on_valid = current_error_on_valid                
-
+    
             # validation
             elif e == epochs - 2:
-
+    
                 if verbose:
                     
                     print(" Validation epoch:")
-
+    
                 iter_val_ = 0
                 while iter_val_ < int(np.floor(X_val.shape[0] / batch_size)):
-
+    
                     batch_val_x = X_val[np.newaxis, iter_val_ * batch_size:batch_size * (iter_val_ + 1)]
                     batch_val_y = Y_val[np.newaxis, iter_val_ * batch_size:batch_size * (iter_val_ + 1)]
-
+    
                     # estimate validation error and append it to a list
                     list_validation_error.append(sess.run(error, feed_dict={x: batch_val_x, y: batch_val_y}))
-
+    
                     iter_val_ += 1
-
+    
             # test
             elif e == epochs - 1:
                  
@@ -447,15 +479,15 @@ def lstm_exp(filename,
                 
                 iter_test_ = 0
                 while iter_test_ < int(np.floor(X_test.shape[0] / batch_size)):
-
+    
                     batch_test_x = X_test[np.newaxis, iter_test_ * batch_size:batch_size * (iter_test_ + 1)]
                     batch_test_y = Y_test[np.newaxis, iter_test_ * batch_size:batch_size * (iter_test_ + 1)]
-
+    
                     pred_y = sess.run(y_hat, feed_dict={x: batch_test_x, y: batch_test_y})
                     plot_y_hat.append(pred_y)
                     plot_y.append(batch_test_y)
                     list_test_error.append(sess.run(error, feed_dict={x: batch_test_x, y: batch_test_y}))
-
+    
                     iter_test_ += 1
             
             e += 1
