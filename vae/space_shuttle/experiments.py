@@ -20,25 +20,23 @@ import utils_dataset as utils
 if __name__ == '__main__':
     
     # parameters of the model
-    data_path = '../../data/augmented_space_shuttle_marotta_valve.csv'
-    sequence_len = 100
-    stride = 20
-    random_stride = True  # for each training epoch, use a random value of stride between 1 and stride
-    vae_hidden_size = 2
+    data_path = '../../data/space_shuttle_marotta_valve.csv'
+    sequence_len = 45
+    batch_size = 1
+    stride = 10
+    random_stride = False  # for each training epoch, use a random value of stride between 1 and stride
+    vae_hidden_size = 1
     subsampling = 1
-    elbo_importance = (1., 1.)  # relative importance to reconstruction and divergence
-    lambda_reg = (0e-3, 0e-3)  # elastic net 'lambdas', L1-L2
+    elbo_importance = (.2, 1.)  # relative importance to reconstruction and divergence
+    lambda_reg = (5e-3, 5e-3)  # elastic net 'lambdas', L1-L2
     rounding = None
     
     # maximize precision or F1-score over this vector
     sigma_threshold_elbo = [1e-2] # [i*1e-3 for i in range(1, 100, 10)]
     
-    learning_rate_elbo = 3e-4
+    learning_rate_elbo = 1e-3
     vae_activation = tf.nn.relu
-    normalization = 'maxmin01'
-        
-    # other parameters
-    batch_size = 1
+    normalization = 'maxmin-11'
     
     # training epochs
     epochs = 100
