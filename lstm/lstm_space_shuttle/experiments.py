@@ -24,7 +24,7 @@ if __name__ == '__main__':
     window = 10
     stride = 1
     batch_size = 20
-    l_rate = 5e-5    
+    l_rate = 3e-4    
     lstm_params = [150]
     lstm_activation = [tf.nn.tanh]
     

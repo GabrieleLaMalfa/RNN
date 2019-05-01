@@ -113,6 +113,10 @@ def series_to_matrix(series, k_shape, striding=1):
         'validation': data is split among train, test and validation: their percentage is chosen according to the percantge
                       of data that has not been included in train (1-non_train_percentage) and assigned to validation
                       proportionally to val_rel_percentage.;
+        'strided-validation': you are likely to use this one for experiments,
+                              data is split among train, test and validation: their percentage is chosen according to the percantge
+                              of data that has not been included in train (1-non_train_percentage) and assigned to validation
+                              proportionally to val_rel_percentage.;
      non_train_percentage:float, given the entire dataset, the percentage of data not used for train;
      val_rel_percentage:float, percentage (relative to non_train_percentage) of dataset used for validation.
          This variable is considered if and only if mode is 'validation';
@@ -254,7 +258,32 @@ def generate_batches(filename,
         
         y_test = series_to_matrix(test[window:], 1, striding=1)
         x_test = series_to_matrix(test, window, striding=1)
+                
+        if stride == 1 or window == 1:
+            
+            x_train = x_train[:-1]; x_test = x_test[:-1]; x_val = x_val[:-1]
+
+        return x_train, y_train, x_val, y_val, x_test, y_test
+
+    elif mode == 'strided-validation':
+
+        # split between train and validation+test
+        train_size = int(np.ceil((1 - non_train_percentage) * len(data)))
+        train = data[:train_size]
         
+        y_train = series_to_matrix(train[window:], 1, stride)
+        x_train = series_to_matrix(train, window, stride)
+
+        # split validation+test into validation and test: stride *is* applied
+        validation_size = int(val_rel_percentage * np.ceil(len(data) * non_train_percentage))
+        val = data[train_size:validation_size+train_size]; test = data[validation_size+train_size:]
+
+        y_val = series_to_matrix(val[window:], 1, striding=stride)
+        x_val = series_to_matrix(val, window, striding=stride)
+        
+        y_test = series_to_matrix(test[window:], 1, striding=stride)
+        x_test = series_to_matrix(test, window, striding=stride)
+                
         if stride == 1 or window == 1:
             
             x_train = x_train[:-1]; x_test = x_test[:-1]; x_val = x_val[:-1]
@@ -295,7 +324,7 @@ def lstm_exp(filename,
     X, Y, X_val, Y_val, X_test, Y_test = generate_batches(filename=filename, 
                                                           window=window, 
                                                           stride=stride,
-                                                          mode='validation',
+                                                          mode='strided-validation',
                                                           non_train_percentage=non_train_percentage,
                                                           val_rel_percentage=val_rel_percentage,
                                                           normalize=normalize,
@@ -495,7 +524,7 @@ def lstm_exp(filename,
     dict_results = {"Window_size": window,
                     "Batch_size": batch_size, "Learning_rate": l_rate,
                     "Y": plot_y, "Y_HAT": plot_y_hat,
-                    "X_train": X, "Y_train": Y, "X_test": X_test, "Y_test": Y_test,
+                    "X_train": X, "Y_train": Y, "X_test": X_test, "Y_test": Y_test, "X_valid": X_val, "Y_valid": Y_val, 
                     "Validation_Errors": list_validation_error, "Test_Errors": list_test_error}
     return dict_results
     

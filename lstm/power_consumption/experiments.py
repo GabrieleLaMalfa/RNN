@@ -21,12 +21,12 @@ if __name__ == '__main__':
 
     DATA_PATH = '../../data/power_consumption.csv'
     
-    window = 300
-    stride = 60
+    window = 400
+    stride = 25
     batch_size = 5
-    l_rate = 2e-4
-    lstm_params = [1100]
-    lstm_activation = [tf.nn.tanh]
+    l_rate = 1e-6
+    lstm_params = [500]
+    lstm_activation = [tf.nn.leaky_relu]
     
     # optimize over this vector the precision or F1-score
     sigma_threshold = [round(i*1e-5, 6) for i in range(1, 1000, 20)]
@@ -100,7 +100,7 @@ if __name__ == '__main__':
         
         # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
         # train 70%, validation_relative 80%
-        target_anomalies[4100:4500] = 1
+        target_anomalies[135:] = 1
         
         # real values
         condition_positive = np.argwhere(target_anomalies == 1)
