@@ -21,12 +21,12 @@ if __name__ == '__main__':
 
     DATA_PATH = '../../data/ecg.csv'
     
-    window = 50
-    stride = 1
+    window = 25
+    stride = 5
     batch_size = 10
-    l_rate = 1e-3  
-    lstm_params = [35, 35]
-    lstm_activation = [tf.nn.relu, tf.nn.relu]
+    l_rate = 3e-4  
+    lstm_params = [150]
+    lstm_activation = [tf.nn.relu]
     
     # optimize over this vector the precision or F1-score
     sigma_threshold = [round(i*1e-5, 5) for i in range(1, 100, 5)]
@@ -100,7 +100,7 @@ if __name__ == '__main__':
         
         # caveat: define the anomalies based on absolute position in test set (i.e. size matters!)
         # train 50%, validation_relative 50%
-        target_anomalies[190:200] = 1
+        target_anomalies[375:400] = 1
         
         # real values
         condition_positive = np.argwhere(target_anomalies == 1)

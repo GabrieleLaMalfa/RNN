@@ -21,20 +21,20 @@ if __name__ == '__main__':
 
     DATA_PATH = '../../data/power_consumption.csv'
     
-    window = 400
-    stride = 25
-    batch_size = 5
-    l_rate = 1e-6
-    lstm_params = [500]
-    lstm_activation = [tf.nn.leaky_relu]
+    window = 100
+    stride = 5
+    batch_size = 10
+    l_rate = 3e-4
+    lstm_params = [50]
+    lstm_activation = [tf.nn.relu]
     
     # optimize over this vector the precision or F1-score
     sigma_threshold = [round(i*1e-5, 6) for i in range(1, 1000, 20)]
 
-    non_train_percentage = 0.7
+    non_train_percentage = 0.5
     training_epochs = 250
     val_rel_percentage = .8
-    normalize = 'maxmin-11'
+    normalize = 'maxmin01'
     time_difference = False
     td_method = None
     stop_on_growing_error = True

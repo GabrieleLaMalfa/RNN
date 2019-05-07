@@ -20,13 +20,14 @@ import utils_dataset as utils
 if __name__ == '__main__':
     
     # parameters of the model
-    data_path = '../../data/sin.csv'
-    sequence_len = 200
-    stride = 20
-    random_stride = True  # for each training epoch, use a random value of stride between 1 and stride
+    data_path = '../../data/ecg.csv'
+    sequence_len = 50
+    batch_size = 1
+    stride = 10
+    random_stride = False  # for each training epoch, use a random value of stride between 1 and stride
     vae_hidden_size = 1
-    subsampling = 3
-    elbo_importance = (.5, 1.)  # relative importance to reconstruction and divergence
+    subsampling = 1
+    elbo_importance = (.2, 1.)  # relative importance to reconstruction and divergence
     lambda_reg = (5e-3, 5e-3)  # elastic net 'lambdas', L1-L2
     rounding = None
     
@@ -34,11 +35,8 @@ if __name__ == '__main__':
     sigma_threshold_elbo = [1e-2] # [i*1e-3 for i in range(1, 100, 10)]
     
     learning_rate_elbo = 1e-3
-    vae_activation = tf.nn.tanh
-    normalization = 'maxmin01'
-        
-    # other parameters
-    batch_size = 1
+    vae_activation = tf.nn.relu
+    normalization = 'maxmin-11'
     
     # training epochs
     epochs = 100
@@ -48,8 +46,8 @@ if __name__ == '__main__':
     
     # early-stopping parameters
     stop_on_growing_error = True
-    stop_valid_percentage = 1.  # percentage of validation used for early-stopping 
-    min_loss_improvment = .01  # percentage of minimum loss' decrease (.01 is 1%)
+    stop_valid_percentage = .5  # percentage of validation used for early-stopping 
+    min_loss_improvment = .005  # percentage of minimum loss' decrease (.01 is 1%)
     
     # reset computational graph
     tf.reset_default_graph()
@@ -61,8 +59,12 @@ if __name__ == '__main__':
         input_ = tf.placeholder(tf.float32, [None, sequence_len, batch_size])  # (batch, input, time)
         
         # encoder/decoder parameters + initialization
-        vae_encoder_shape_weights = [batch_size*sequence_len, int(batch_size*sequence_len*.5), vae_hidden_size*2]
-        vae_decoder_shape_weights = [vae_hidden_size, int(batch_size*sequence_len*.5), batch_size*sequence_len]
+        vae_encoder_shape_weights = [batch_size*sequence_len, 
+                                     int(batch_size*sequence_len*.5), 
+                                     vae_hidden_size*2]
+        vae_decoder_shape_weights = [vae_hidden_size, 
+                                     int(batch_size*sequence_len*.5), 
+                                     batch_size*sequence_len]
         
         zip_weights_encoder = zip(vae_encoder_shape_weights[:-1], vae_encoder_shape_weights[1:])
         
@@ -154,7 +156,7 @@ if __name__ == '__main__':
                                                                  filename=data_path, 
                                                                  window=sequence_len,
                                                                  stride=stride,
-                                                                 mode='validation', 
+                                                                 mode='strided-validation', 
                                                                  non_train_percentage=.5,
                                                                  val_rel_percentage=.5,
                                                                  normalize=normalization,
@@ -191,7 +193,7 @@ if __name__ == '__main__':
                                                                      filename=data_path, 
                                                                      window=sequence_len,
                                                                      stride=np.random.randint(1, stride),
-                                                                     mode='validation', 
+                                                                     mode='strided-validation', 
                                                                      non_train_percentage=.5,
                                                                      val_rel_percentage=.5,
                                                                      normalize=normalization,
@@ -286,7 +288,7 @@ if __name__ == '__main__':
             iter_ = 0
             
             while iter_ < int(np.floor(x_test.shape[0] / batch_size)):
-        
+                        
                 batch_x = x_test[iter_*batch_size: (iter_+1)*batch_size, :].T.reshape(1, sequence_len, batch_size)
                             
                 # get probability of the encoding and a boolean (anomaly or not)        
