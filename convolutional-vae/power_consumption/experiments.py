@@ -25,7 +25,7 @@ if __name__ == '__main__':
     batch_size = 1
     stride = 5
     random_stride = False  # for each training epoch, use a random value of stride between 1 and stride
-    vae_hidden_size = 3
+    vae_hidden_size = 2
     subsampling = 1
     elbo_importance = (1., 1.)  # relative importance to reconstruction and divergence
     lambda_reg = (5e-3, 5e-3)  # elastic net 'lambdas', L1-L2
@@ -35,7 +35,7 @@ if __name__ == '__main__':
     sigma_threshold_elbo = [1e-2] # [i*1e-3 for i in range(1, 100, 10)]
     
     learning_rate_elbo = 1e-3
-    vae_activation = tf.nn.tanh
+    vae_activation = tf.nn.relu
     normalization = 'maxmin01'
     
     # training epochs
@@ -53,20 +53,17 @@ if __name__ == '__main__':
     tf.reset_default_graph()
     
     # create the computational graph
-    with tf.device('/device:CPU:0'):
+    with tf.device('/device:GPU:0'):
                 
         # define input/output pairs
         input_ = tf.placeholder(tf.float32, [None, sequence_len, batch_size])  # (batch, input, time)
         
         # encoder/decoder parameters + initialization
-        vae_encoder_shape_weights = [batch_size*sequence_len, 
-                                     int(batch_size*sequence_len*.5), 
-                                     int(batch_size*sequence_len*.25),
-                                     vae_hidden_size*2]
-        vae_decoder_shape_weights = [vae_hidden_size, 
-                                     int(batch_size*sequence_len*.5), 
-                                     int(batch_size*sequence_len*.25),
-                                     batch_size*sequence_len]
+        vae_encoder_shape_weights = [5, 3, 3]
+        vae_decoder_shape_weights = [3, 3, 5]
+        
+        vae_encoder_strides = [1, 2, 3]
+        vae_dencoder_strides = [3, 2, 1]       
         
         zip_weights_encoder = zip(vae_encoder_shape_weights[:-1], vae_encoder_shape_weights[1:])
         
@@ -82,13 +79,23 @@ if __name__ == '__main__':
         # VAE graph's definition
         flattened_input = tf.layers.flatten(input_)
         
-        vae_encoder = tf.matmul(flattened_input, weights_vae_encoder[0]) + bias_vae_encoder[0]
+        vae_encoder = tf.nn.conv2d(flattened_input, 
+                                   weights_vae_encoder[0],
+                                   vae_encoder_strides[0],
+                                   'SAME')        
         vae_encoder = vae_activation(vae_encoder)
         
-        for (w_vae, b_vae) in zip(weights_vae_encoder[1:], bias_vae_encoder[1:]):
+        for (w_vae, s_vae) in zip(weights_vae_encoder[1:], vae_encoder_strides[1:]):
             
-            vae_encoder = tf.matmul(vae_encoder, w_vae) + b_vae
+            vae_encoder = tf.nn.conv2d(vae_encoder, 
+                                       w_vae,
+                                       s_vae,
+                                       'SAME')
             vae_encoder = vae_activation(vae_encoder)
+        
+        # fully connected hidden layer to shape the nn hidden state
+        hidden_enc_weights = tf.Variable(tf.truncated_normal(shape=[shape]))
+        vae_encoder = tf.matmul(vae_encoder, hidden_enc_weights) + hidden_enc_bias
         
         # means and variances' vectors of the learnt hidden distribution
         #  we assume the hidden gaussian's variances matrix is diagonal
