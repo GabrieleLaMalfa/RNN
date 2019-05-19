@@ -20,18 +20,10 @@ import utils_dataset as utils
 if __name__ == '__main__':
     
     # parameters of the model
-    data_path = '../../data/power_consumption.csv'
-    sequence_len = 100
+    data_path = '../../data/sin_short.csv'
+    sequence_len = 45
     batch_size = 1
     stride = 5
-    num_conv_channels = 5  # convolutional channels
-    
-    # convolutional kernels + strides
-    vae_encoder_shape_weights = [2, 5, 5]
-    vae_decoder_shape_weights = [5, 5, 2]    
-    vae_encoder_strides = [1, 2, 2]
-    vae_decoder_strides = [1, 2, 2] 
-    
     random_stride = False  # for each training epoch, use a random value of stride between 1 and stride
     vae_hidden_size = 1
     subsampling = 1
@@ -42,8 +34,8 @@ if __name__ == '__main__':
     # maximize precision or F1-score over this vector
     sigma_threshold_elbo = [1e-2] # [i*1e-3 for i in range(1, 100, 10)]
     
-    learning_rate_elbo = 1e-4
-    vae_activation = tf.nn.relu6
+    learning_rate_elbo = 1e-3
+    vae_activation = tf.nn.relu
     normalization = 'maxmin-11'
     
     # training epochs
@@ -64,56 +56,49 @@ if __name__ == '__main__':
     with tf.device('/device:CPU:0'):
                 
         # define input/output pairs
-        input_ = tf.placeholder(tf.float32, [1, sequence_len, batch_size])  # (batch, input, time)        
-       
+        input_ = tf.placeholder(tf.float32, [None, sequence_len, batch_size])  # (batch, input, time)
+        
+        # encoder/decoder parameters + initialization
+        vae_encoder_shape_weights = [batch_size*sequence_len, 
+                                     int(batch_size*sequence_len*.5), 
+                                     vae_hidden_size*2]
+        vae_decoder_shape_weights = [vae_hidden_size, 
+                                     int(batch_size*sequence_len*.5), 
+                                     batch_size*sequence_len]
+        
+        zip_weights_encoder = zip(vae_encoder_shape_weights[:-1], vae_encoder_shape_weights[1:])
+        
         weights_vae_encoder = [tf.Variable(tf.truncated_normal(shape=[shape,
-                                                                      num_conv_channels,
-                                                                      num_conv_channels])) for shape in vae_encoder_shape_weights]
-            
-        weights_vae_decoder = [tf.Variable(tf.truncated_normal(shape=[batch_size,
-                                                                      1,
-                                                                      shape,
-                                                                      num_conv_channels])) for shape in vae_decoder_shape_weights]
+                                                                      next_shape])) for (shape, next_shape) in zip_weights_encoder]
+        bias_vae_encoder = [tf.Variable(tf.truncated_normal(shape=[shape])) for shape in vae_encoder_shape_weights[1:]]
         
-        # VAE graph's definition 
+        zip_weights_decoder = zip(vae_decoder_shape_weights[:-1], vae_decoder_shape_weights[1:])
+        weights_vae_decoder = [tf.Variable(tf.truncated_normal(shape=[shape,
+                                                                      next_shape])) for (shape, next_shape) in zip_weights_decoder]
+        bias_vae_decoder = [tf.Variable(tf.truncated_normal(shape=[shape])) for shape in vae_decoder_shape_weights[1:]]
         
-        # use multiple input, one for each input channel
-        input_tiled = tf.tile(input_, [1, 1, num_conv_channels])
+        # VAE graph's definition
+        flattened_input = tf.layers.flatten(input_)
         
-        vae_encoder = tf.nn.conv1d(input_tiled, 
-                                   weights_vae_encoder[0],
-                                   vae_encoder_strides[0],
-                                   'SAME')
-        
+        vae_encoder = tf.matmul(flattened_input, weights_vae_encoder[0]) + bias_vae_encoder[0]
         vae_encoder = vae_activation(vae_encoder)
         
-        for (w_vae, s_vae) in zip(weights_vae_encoder[1:], vae_encoder_strides[1:]):
+        for (w_vae, b_vae) in zip(weights_vae_encoder[1:], bias_vae_encoder[1:]):
             
-            vae_encoder = tf.nn.conv1d(vae_encoder, 
-                                       w_vae,
-                                       s_vae,
-                                       'SAME')
-
+            vae_encoder = tf.matmul(vae_encoder, w_vae) + b_vae
             vae_encoder = vae_activation(vae_encoder)
-        
-        # fully connected hidden layer to shape the nn hidden state
-        hidden_enc_weights = tf.Variable(tf.truncated_normal(shape=[vae_encoder.get_shape().as_list()[1],
-                                                                    num_conv_channels,
-                                                                    2*vae_hidden_size]))
-    
-        hidden_enc_bias = tf.Variable(tf.truncated_normal(shape=[2*vae_hidden_size,
-                                                                 1]))
-    
-        vae_encoder = tf.tensordot(hidden_enc_weights, tf.transpose(vae_encoder), axes=([1,0],[0,1])) 
-        vae_encoder += hidden_enc_bias
         
         # means and variances' vectors of the learnt hidden distribution
         #  we assume the hidden gaussian's variances matrix is diagonal
-        loc = tf.slice(vae_encoder, [0, 0], [vae_hidden_size, -1])
-        scale = tf.slice(tf.nn.softplus(vae_encoder), [vae_hidden_size, 0], [vae_hidden_size, -1])
+        loc = tf.slice(vae_encoder, [0, 0], [-1, vae_hidden_size])
+        loc = tf.squeeze(loc, axis=0)
+        scale = tf.slice(tf.nn.softplus(vae_encoder), [0, vae_hidden_size], [-1, vae_hidden_size])
+        scale = tf.squeeze(scale, 0) 
         
-        loc = tf.transpose(loc)
-        scale = tf.transpose(scale)
+        """
+        # the distribution is in charge of generating the hidden sample
+        hidden_sample = tf.slice(vae_encoder, [0, 2*vae_hidden_size], [-1, vae_hidden_size])
+        """
         
         # sample from the hidden ditribution
         vae_hidden_distr = tfp.distributions.MultivariateNormalDiag(loc, scale)
@@ -127,52 +112,28 @@ if __name__ == '__main__':
         
         # get probability of the hidden state
         vae_hidden_prob = prior.prob(hidden_sample)
-                
-        # rebuild the input with 'de-convolution' operations  
-        feed_decoder = tf.tile(tf.expand_dims(hidden_sample, -1), [1, 1, num_conv_channels])
-        feed_decoder = tf.reshape(feed_decoder, shape=(1,
-                                                       1,
-                                                       vae_hidden_size, 
-                                                       num_conv_channels))
         
-        vae_decoder = tf.contrib.layers.conv2d_transpose(feed_decoder,
-                                                         num_outputs=num_conv_channels,
-                                                         kernel_size=(1, vae_decoder_shape_weights[0]),
-                                                         stride=vae_decoder_strides[0],
-                                                         padding='SAME')
-        
-        vae_decoder = vae_activation(vae_decoder)
-
-        
-        for (w_vae, s_vae) in zip(vae_decoder_shape_weights[1:], vae_decoder_strides[1:]):
+        """
+        # get probability of the hidden state
+        s_ = vae_hidden_distr.sample(int(100e6))
+        in_box = tf.cast(tf.reduce_all(s_ <= hidden_sample, axis=-1), prior.dtype)
+        vae_hidden_prob = tf.reduce_mean(in_box, axis=0)
+        """
             
-            vae_decoder = tf.contrib.layers.conv2d_transpose(vae_decoder,
-                                                             num_outputs=num_conv_channels,
-                                                             kernel_size=(1, w_vae),
-                                                             stride=s_vae,
-                                                             padding='SAME')
+        feed_decoder = tf.reshape(hidden_sample, shape=(-1, vae_hidden_size))
+        vae_decoder = tf.matmul(feed_decoder, weights_vae_decoder[0]) + bias_vae_decoder[0]
+        vae_decoder = vae_activation(vae_decoder)    
+        
+        for (w_vae, b_vae) in zip(weights_vae_decoder[1:], bias_vae_decoder[1:]):
             
+            vae_decoder = tf.matmul(vae_decoder, w_vae) + b_vae
             vae_decoder = vae_activation(vae_decoder)
-            
-            
-        # hidden fully-connected layer
-        hidden_dec_weights = tf.Variable(tf.truncated_normal(shape=[vae_decoder.get_shape().as_list()[2],
-                                                                    vae_decoder.get_shape().as_list()[1],
-                                                                    input_.get_shape().as_list()[1]]))
-    
-        hidden_dec_bias = tf.Variable(tf.truncated_normal(shape=[1,
-                                                                 ]))
-           
-        vae_decoder = tf.squeeze(vae_decoder, 0)
-        vae_decoder = tf.tensordot(hidden_dec_weights, vae_decoder, axes=([1,0],[0,1])) 
-        vae_decoder += hidden_dec_bias
-        vae_decoder = tf.transpose(tf.expand_dims(vae_decoder, axis=0))
         
         # time-series reconstruction and ELBO loss
         vae_reconstruction = tfp.distributions.MultivariateNormalDiag(tf.constant(np.zeros(batch_size*sequence_len, dtype='float32')),
                                                                       tf.constant(np.ones(batch_size*sequence_len, dtype='float32')))
             
-        likelihood = elbo_importance[0]*tf.reduce_mean(vae_reconstruction.log_prob(vae_decoder))        
+        likelihood = elbo_importance[0]*vae_reconstruction.log_prob(vae_decoder)            
         divergence = elbo_importance[1]*tfp.distributions.kl_divergence(prior, vae_hidden_distr)        
         elbo = tf.reduce_mean(likelihood - divergence)
         

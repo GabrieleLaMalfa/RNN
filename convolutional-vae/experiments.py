@@ -13,29 +13,29 @@ import sys
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-sys.path.append('../../utils')
+sys.path.append('../utils')
 import utils_dataset as utils
 
 
 if __name__ == '__main__':
     
     # parameters of the model
-    data_path = '../../data/power_consumption.csv'
-    sequence_len = 100
+    data_path = '../data/sin_short.csv'
+    sequence_len = 40
     batch_size = 1
-    stride = 5
+    stride = 3
     num_conv_channels = 5  # convolutional channels
     
     # convolutional kernels + strides
-    vae_encoder_shape_weights = [2, 5, 5]
-    vae_decoder_shape_weights = [5, 5, 2]    
-    vae_encoder_strides = [1, 2, 2]
-    vae_decoder_strides = [1, 2, 2] 
+    vae_encoder_shape_weights = [10]
+    vae_decoder_shape_weights = [7, 5]    
+    vae_encoder_strides = [2]
+    vae_decoder_strides = [2, 2] 
     
     random_stride = False  # for each training epoch, use a random value of stride between 1 and stride
     vae_hidden_size = 1
     subsampling = 1
-    elbo_importance = (.2, 1.)  # relative importance to reconstruction and divergence
+    elbo_importance = (.1, 1.)  # relative importance to reconstruction and divergence
     lambda_reg = (5e-3, 5e-3)  # elastic net 'lambdas', L1-L2
     rounding = None
     
@@ -43,8 +43,8 @@ if __name__ == '__main__':
     sigma_threshold_elbo = [1e-2] # [i*1e-3 for i in range(1, 100, 10)]
     
     learning_rate_elbo = 1e-4
-    vae_activation = tf.nn.relu6
-    normalization = 'maxmin-11'
+    vae_activation = tf.nn.tanh
+    normalization = 'maxmin01'
     
     # training epochs
     epochs = 100
@@ -54,8 +54,8 @@ if __name__ == '__main__':
     
     # early-stopping parameters
     stop_on_growing_error = True
-    stop_valid_percentage = .5  # percentage of validation used for early-stopping 
-    min_loss_improvment = .005  # percentage of minimum loss' decrease (.01 is 1%)
+    stop_valid_percentage = .25  # percentage of validation used for early-stopping 
+    min_loss_improvment = .02  # percentage of minimum loss' decrease (.01 is 1%)
     
     # reset computational graph
     tf.reset_default_graph()

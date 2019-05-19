@@ -25,7 +25,7 @@ if __name__ == '__main__':
     batch_size = 1
     stride = 5
     random_stride = False  # for each training epoch, use a random value of stride between 1 and stride
-    vae_hidden_size = 3
+    vae_hidden_size = 2
     subsampling = 1
     elbo_importance = (1., 1.)  # relative importance to reconstruction and divergence
     lambda_reg = (5e-3, 5e-3)  # elastic net 'lambdas', L1-L2
