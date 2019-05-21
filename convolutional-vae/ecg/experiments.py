@@ -20,17 +20,17 @@ import utils_dataset as utils
 if __name__ == '__main__':
     
     # parameters of the model
-    data_path = '../../data/power_consumption.csv'
+    data_path = '../../data/ecg.csv'
     sequence_len = 100
     batch_size = 1
-    stride = 7
+    stride = 5
     num_conv_channels = 5  # convolutional channels
     
     # convolutional kernels + strides
-    vae_encoder_shape_weights = [5, 5]
-    vae_decoder_shape_weights = [7, 5, 5]    
-    vae_encoder_strides = [3, 3]
-    vae_decoder_strides = [3, 3, 2] 
+    vae_encoder_shape_weights = [3, 3, 2]
+    vae_decoder_shape_weights = [5, 5, 3, 3]    
+    vae_encoder_strides = [2, 2, 2]
+    vae_decoder_strides = [2, 2, 2, 3] 
     
     # produce a noised version of training data for each training epoch:
     #  the second parameter is the percentage of noise that is added wrt max-min of the time series'values
@@ -47,7 +47,7 @@ if __name__ == '__main__':
     # maximize precision or F1-score over this vector
     sigma_threshold_elbo = [1e-2] # [i*1e-3 for i in range(1, 100, 10)]
     
-    learning_rate_elbo = 1e-4
+    learning_rate_elbo = 1e-3
     vae_activation = tf.nn.relu6
     normalization = 'maxmin01'
     
