@@ -1,4 +1,4 @@
-sequence_len, batch_size, stride, num_conv_channels, vae_decoder_shape_weights, 
+sequence_len, batch_size, stride, num_conv_channels, vae_encoder_shape_weights, 
 vae_decoder_shape_weights, vae_encoder_strides, vae_decoder_strides, 
 vae_hidden_size, subsampling, elbo_importance, 
 lambda_reg, rounding, learning_rate_elbo, vae_activation, normalization

@@ -21,16 +21,16 @@ if __name__ == '__main__':
     
     # parameters of the model
     data_path = '../../data/power_consumption.csv'
-    sequence_len = 100
+    sequence_len = 400
     batch_size = 1
-    stride = 7
-    num_conv_channels = 5  # convolutional channels
+    stride = 5
+    num_conv_channels = 2  # convolutional channels
     
     # convolutional kernels + strides
-    vae_encoder_shape_weights = [5, 5]
-    vae_decoder_shape_weights = [7, 5, 5]    
-    vae_encoder_strides = [3, 3]
-    vae_decoder_strides = [3, 3, 2] 
+    vae_encoder_shape_weights = [5, 10, 10]
+    vae_decoder_shape_weights = [15, 10, 10]    
+    vae_encoder_strides = [5, 5, 5]
+    vae_decoder_strides = [10, 5, 5]  
     
     # produce a noised version of training data for each training epoch:
     #  the second parameter is the percentage of noise that is added wrt max-min of the time series'values
@@ -47,7 +47,7 @@ if __name__ == '__main__':
     # maximize precision or F1-score over this vector
     sigma_threshold_elbo = [1e-2] # [i*1e-3 for i in range(1, 100, 10)]
     
-    learning_rate_elbo = 1e-4
+    learning_rate_elbo = 1e-3
     vae_activation = tf.nn.relu6
     normalization = 'maxmin01'
     
@@ -59,8 +59,8 @@ if __name__ == '__main__':
     
     # early-stopping parameters
     stop_on_growing_error = True
-    stop_valid_percentage = 1.  # percentage of validation used for early-stopping 
-    min_loss_improvment = .03  # percentage of minimum loss' decrease (.01 is 1%)
+    stop_valid_percentage = .3  # percentage of validation used for early-stopping 
+    min_loss_improvment = .01  # percentage of minimum loss' decrease (.01 is 1%)
     
     # reset computational graph
     tf.reset_default_graph()
@@ -218,7 +218,7 @@ if __name__ == '__main__':
         optimizer_elbo = tf.train.AdamOptimizer(learning_rate_elbo).minimize(regularized_elbo)
         
     if random_stride == False:
-        
+               
         # extract train and test
         x_train, y_train, x_valid, y_valid, x_test, y_test = utils.generate_batches(
                                                                  filename=data_path, 
@@ -232,10 +232,10 @@ if __name__ == '__main__':
                                                                  td_method=None,
                                                                  subsampling=subsampling,
                                                                  rounding=rounding)
-       
+               
         # suppress second axis on Y values (the algorithms expects shapes like (n,) for the prediction)
         y_train = y_train[:,0]; y_valid = y_valid[:,0]; y_test = y_test[:,0]
-        
+               
         if len(x_train) > len(y_train):
             
             x_train = x_train[:len(y_train)]
@@ -247,8 +247,15 @@ if __name__ == '__main__':
         if len(x_test) > len(y_test):
             
             x_test = x_test[:len(y_test)]
-                    
-
+            
+        # adjust train test size (for testing purpose)
+        y_train = y_train[:1370]
+        x_train = x_train[:1370,:]
+        y_valid = y_valid[15:730]
+        x_valid = x_valid[15:730,:]
+        y_test = y_test[700:]
+        x_test = x_test[700:,:]
+            
     with tf.Session(config=tf.ConfigProto(allow_soft_placement=True,
                                           log_device_placement=True)) as sess:
         
