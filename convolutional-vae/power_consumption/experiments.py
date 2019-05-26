@@ -21,35 +21,35 @@ if __name__ == '__main__':
     
     # parameters of the model
     data_path = '../../data/power_consumption.csv'
-    sequence_len = 400
+    sequence_len = 500
     batch_size = 1
-    stride = 5
-    num_conv_channels = 2  # convolutional channels
+    stride = 1
+    num_conv_channels = 8  # convolutional channels
     
     # convolutional kernels + strides
-    vae_encoder_shape_weights = [5, 10, 10]
-    vae_decoder_shape_weights = [15, 10, 10]    
-    vae_encoder_strides = [5, 5, 5]
-    vae_decoder_strides = [10, 5, 5]  
+    vae_encoder_shape_weights = [7, 10]
+    vae_decoder_shape_weights = [7, 10]    
+    vae_encoder_strides = [3, 5]
+    vae_decoder_strides = [3, 5]  
     
     # produce a noised version of training data for each training epoch:
     #  the second parameter is the percentage of noise that is added wrt max-min of the time series'values
-    make_some_noise = (True, 5e-2)  
+    make_some_noise = (False, 5e-2)  
     
     # for each training epoch, use a random value of stride between 1 and stride
     random_stride = False  
     vae_hidden_size = 1
     subsampling = 1
-    elbo_importance = (.2, 1.)  # relative importance to reconstruction and divergence
-    lambda_reg = (5e-3, 5e-3)  # elastic net 'lambdas', L1-L2
+    elbo_importance = (.1, 1.)  # relative importance to reconstruction and divergence
+    lambda_reg = (5e-3, 0e-3)  # elastic net 'lambdas', L1-L2
     rounding = None
     
     # maximize precision or F1-score over this vector
     sigma_threshold_elbo = [1e-2] # [i*1e-3 for i in range(1, 100, 10)]
     
-    learning_rate_elbo = 1e-3
+    learning_rate_elbo = 1e-4
     vae_activation = tf.nn.relu6
-    normalization = 'maxmin01'
+    normalization = 'maxmin-11'
     
     # training epochs
     epochs = 100
@@ -59,7 +59,7 @@ if __name__ == '__main__':
     
     # early-stopping parameters
     stop_on_growing_error = True
-    stop_valid_percentage = .3  # percentage of validation used for early-stopping 
+    stop_valid_percentage = 1.  # percentage of validation used for early-stopping 
     min_loss_improvment = .01  # percentage of minimum loss' decrease (.01 is 1%)
     
     # reset computational graph
@@ -249,12 +249,12 @@ if __name__ == '__main__':
             x_test = x_test[:len(y_test)]
             
         # adjust train test size (for testing purpose)
-        y_train = y_train[:1370]
-        x_train = x_train[:1370,:]
-        y_valid = y_valid[15:730]
-        x_valid = x_valid[15:730,:]
-        y_test = y_test[700:]
-        x_test = x_test[700:,:]
+        y_train = y_train[300:3000]
+        x_train = x_train[300:3000,:]
+        y_valid = y_valid[300:1600]
+        x_valid = x_valid[300:1600,:]
+        y_test = y_test[4500:]
+        x_test = x_test[4500:,:]
             
     with tf.Session(config=tf.ConfigProto(allow_soft_placement=True,
                                           log_device_placement=True)) as sess:
@@ -318,11 +318,14 @@ if __name__ == '__main__':
                 random_noise = np.random.rand(*x_train.shape)*random_noise
                 x_train += random_noise
                 
-            print("epoch ", e)
+            print("Train epoch ", e)
             iter_ = 0
             
-            while iter_ < int(np.floor(x_train.shape[0] / batch_size)):
-        
+            train_num_samples = int(np.floor(x_train.shape[0] / batch_size))            
+            while iter_ < train_num_samples:
+                   
+                #print("Sample ", iter_,"out of ", train_num_samples)
+                
                 batch_x = x_train[iter_*batch_size: (iter_+1)*batch_size, :].T.reshape(1, sequence_len, batch_size)
                 
                 # run VAE encoding-decoding
@@ -331,17 +334,22 @@ if __name__ == '__main__':
                 iter_ +=  1
 
             if stop_on_growing_error:
+                
+                print("Validation")
                                                
                 current_error_on_valid = .0
-                
+                                
                 # verificate stop condition
                 iter_val_ = 0
-                while iter_val_ < int(stop_valid_percentage * np.floor(x_valid.shape[0] / batch_size)):
+                validation_num_samples = int(stop_valid_percentage * np.floor(x_valid.shape[0] / batch_size))
+                while iter_val_ < validation_num_samples:
                     
+                    #print("Sample ", iter_,"out of ", validation_num_samples)
+
                     batch_x_val = x_valid[iter_val_*batch_size: (iter_val_+1)*batch_size, :].T.reshape(1, sequence_len, batch_size)
                     
                     # accumulate error
-                    current_error_on_valid +=  np.abs(np.sum(sess.run(-elbo, feed_dict={input_: batch_x_val})))
+                    current_error_on_valid +=  np.abs(np.sum(sess.run(regularized_elbo, feed_dict={input_: batch_x_val})))
 
                     iter_val_ += 1
                     
