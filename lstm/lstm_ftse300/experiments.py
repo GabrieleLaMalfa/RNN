@@ -33,7 +33,7 @@ if __name__ == '__main__':
 
     non_train_percentage = 0.5
     training_epochs = 250
-    val_rel_percentage = .3
+    val_rel_percentage = .5
     normalize = 'maxmin01'
     time_difference = False
     td_method = None
@@ -136,7 +136,7 @@ if __name__ == '__main__':
     print("\nPrediction:")
     ax1.plot(plot_y, 'b', label='index')
     ax1.set_xlabel('Date')
-    ax1.set_ylabel('Space Shuttle')
+    ax1.set_ylabel('FTSE 300 (Norm)')
 
     # plot predictions
 #    ax1.plot(plot_y_hat, 'r', label='prediction')
@@ -171,7 +171,7 @@ if __name__ == '__main__':
     print("\nReconstruction:")
     ax1.plot(recovered_plot_y, 'b', label='index')
     ax1.set_xlabel('RECONSTRUCTION: Date')
-    ax1.set_ylabel('Space Shuttle')
+    ax1.set_ylabel('FTSE 300 (Norm)')
 
     # plot predictions
 #    ax1.plot(recovered_plot_y_hat, 'r', label='prediction')
