@@ -6,8 +6,10 @@ Created on Sun Feb 10 09:36:16 2019
 """
 
 import copy as cp
+import logging
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 import scipy.stats as scistats
 import sys
 import tensorflow as tf
@@ -16,12 +18,14 @@ import tensorflow_probability as tfp
 sys.path.append('../../utils')
 import utils_dataset as utils
 
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.FATAL)
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 if __name__ == '__main__':
     
     # parameters of the model
-    data_path = '../../data/ecg.csv'
-    sequence_len = 100
+    data_path = '../../data/FTSE300.csv'
+    sequence_len = 50
     batch_size = 1
     stride = 1
     random_stride = False  # for each training epoch, use a random value of stride between 1 and stride
@@ -32,9 +36,9 @@ if __name__ == '__main__':
     rounding = None
     
     # maximize precision or F1-score over this vector
-    sigma_threshold_elbo = [1e-3] # [i*1e-3 for i in range(1, 100, 10)]
+    sigma_threshold_elbo = [1e-2] # [i*1e-3 for i in range(1, 100, 10)]
     
-    learning_rate_elbo = 1e-4
+    learning_rate_elbo = 1e-3
     vae_activation = tf.nn.relu
     normalization = 'maxmin-11'
     
@@ -316,7 +320,11 @@ if __name__ == '__main__':
             # train 50%, validation_relative 50%
             # performances
             target_anomalies = np.zeros(shape=int(np.floor(y_test.shape[0] / batch_size))*batch_size)
-            target_anomalies[1930:2000] = 1
+            target_anomalies[195:265] = 1
+            target_anomalies[366:416] = 1
+            target_anomalies[543:605] = 1
+            target_anomalies[693:713] = 1
+            target_anomalies[754:774] = 1
         
             # real values
             condition_positive = np.argwhere(target_anomalies == 1)
@@ -340,18 +348,21 @@ if __name__ == '__main__':
                 best_recall = recall
                 best_predicted_positive = cp.copy(predicted_positive)
                 
-        # plot data series    
+       # plot data series    
         fig = plt.figure()
         
         ax1 = plt.subplot(211)
         print("\nTime series:")
         ax1.plot(y_test, 'b', label='index')
         bbox_props = dict(boxstyle="square", fc="white", ec="black", lw=1)
-        ax1.annotate('ECG Anomaly', xy=(1700, 13.5), xytext=(1700, 13.5),
+        ax1.annotate('2017 Market Slowdown', xy=(1700, 13.5), xytext=(1700, 13.5),
             arrowprops=dict(facecolor='black', width = 0.02, headwidth = 2, headlength = 3, shrink=0.1), bbox=bbox_props, size = 6)
-
+        ax1.annotate('2018 Brexit Uncertainty and USA-China Tradewar', xy=(1700, 13.5), xytext=(1700, 13.5),
+            arrowprops=dict(facecolor='black', width = 0.02, headwidth = 2, headlength = 3, shrink=0.1), bbox=bbox_props, size = 6)
+        ax1.annotate('2019 Brexit - European Slowdown', xy=(1700, 13.5), xytext=(1700, 13.5),
+            arrowprops=dict(facecolor='black', width = 0.02, headwidth = 2, headlength = 3, shrink=0.1), bbox=bbox_props, size = 6)
         #ax1.set_xlabel('Time')
-        ax1.set_ylabel('ECG')
+        ax1.set_ylabel('FTSE Eurofirst 300')
         
         # plot predictions
         for i in vae_anomalies:
@@ -371,8 +382,3 @@ if __name__ == '__main__':
                 
         fig.tight_layout()
         plt.show()
-                
-        print("Anomalies in the series:", condition_positive.T)
-        print("Anomalies detected with threshold: ", best_threshold)
-        print(best_predicted_positive.T)
-        print("Precision and recall ", best_precision, best_recall)

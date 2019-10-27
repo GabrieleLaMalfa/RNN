@@ -316,7 +316,7 @@ if __name__ == '__main__':
             # train 50%, validation_relative 50%
             # performances
             target_anomalies = np.zeros(shape=int(np.floor(y_test.shape[0] / batch_size))*batch_size)
-            target_anomalies[160:200] = 1
+            target_anomalies[512:535] = 1
         
             # real values
             condition_positive = np.argwhere(target_anomalies == 1)
@@ -341,26 +341,33 @@ if __name__ == '__main__':
                 best_predicted_positive = cp.copy(predicted_positive)
                 
         # plot data series    
-        fig, ax1 = plt.subplots()
+        fig = plt.figure()
         
+        ax1 = plt.subplot(211)
         print("\nTime series:")
         ax1.plot(y_test, 'b', label='index')
-        ax1.set_xlabel('Time')
-        ax1.set_ylabel('Space Shuttle')
+        bbox_props = dict(boxstyle="square", fc="white", ec="black", lw=1)
+        ax1.annotate('Space Shuttle Marotta Anomaly', xy=(1700, 13.5), xytext=(1700, 13.5),
+            arrowprops=dict(facecolor='black', width = 0.02, headwidth = 2, headlength = 3, shrink=0.1), bbox=bbox_props, size = 6)
+
+        #ax1.set_xlabel('Time')
+        ax1.set_ylabel('Space Shuttle Marotta')
         
         # plot predictions
         for i in vae_anomalies:
     
-            plt.axvspan(i, i+1, color='yellow', alpha=0.5, lw=0)
-    
+            plt.axvspan(i, i+1, color='green', alpha=0.7, lw=0)
+            
+        for j in target_anomalies:
+            plt.axvspan(j, color='orange', alpha=0.3, lw=0)
         fig.tight_layout()
         plt.show()
         
-        fig, ax1 = plt.subplots()
-
-        ax1.scatter([i for i in range(len(p_anom))],p_anom)
-        ax1.set_xlabel('Time')
-        ax1.set_ylabel('Likelihood')
+        
+        ax2 = plt.subplot(212)
+        ax2.scatter([i for i in range(len(p_anom))],p_anom)
+        #ax2.set_xlabel('Time')
+        ax2.set_ylabel('Likelihood')
                 
         fig.tight_layout()
         plt.show()
